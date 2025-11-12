@@ -1,15 +1,15 @@
-Welcome to e3ti
+Welcome to mint
 ===============
 
 .. figure:: _static/E3TIDesign.png
-   :alt: e3ti overview
+   :alt: mint overview
    :align: center
    :width: 80%
-   :target: https://github.com/winstonwinstonwinston/E3TI
+   :target: https://github.com/winstonwinstonwinston/mint
 
-   *e3ti overview.*
+   *mint overview.*
 
-What is e3ti?
+What is mint?
 -------------
 Equivariant stochastic interpolants for geometric rare event sampling. Clean API, typed, with docs generated automatically.
    
@@ -17,7 +17,7 @@ Equivariant stochastic interpolants for geometric rare event sampling. Clean API
    :caption: API
    :maxdepth: 2
 
-   api/e3ti
+   api/mint
 
 .. toctree::
    :caption: Guides

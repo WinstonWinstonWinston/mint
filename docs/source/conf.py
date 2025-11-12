@@ -6,7 +6,7 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = 'e3ti'
+project = 'mint'
 copyright = '2025, Winlord'
 author = 'Winlord'
 release = '0.1'

@@ -4,7 +4,7 @@ import os
 import logging
 import hydra
 from pytorch_lightning.utilities.rank_zero import rank_zero_only #type: ignore
-from e3ti.experiment.train import Train
+from mint.experiment.train import Train
 
 logger = logging.getLogger(__name__)
 logging_levels = ("debug", "info", "warning", "error", "exception", "fatal", "critical")

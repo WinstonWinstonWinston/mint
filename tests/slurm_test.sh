@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J e3ti-test
+#SBATCH -J mint-test
 #SBATCH -o slurm-%j.out
 #SBATCH -e slurm-%j.err
 #SBATCH -p interactive-gpu

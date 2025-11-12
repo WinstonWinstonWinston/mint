@@ -6,12 +6,12 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # repo roo
 autodoc_mock_imports = ["torch", "torch_geometric", "e3nn", "wandb"]
 
 # Safe sanity check (optional)
-assert importlib.util.find_spec("e3ti"), "Sphinx can't import 'e3ti' from repo root"
+assert importlib.util.find_spec("mint"), "Sphinx can't import 'mint' from repo root"
 
 # -- Project information -----------------------------------------------------
-project = "e3ti"
+project = "mint"
 author = "Winston"
-from e3ti import __version__ as release  # noqa: E402
+from mint import __version__ as release  # noqa: E402
 
 # -- Extensions --------------------------------------------------------------
 extensions = [
@@ -23,10 +23,10 @@ extensions = [
     "autoapi.extension",        # AutoAPI
 ]
 
-# ----------------------- AutoAPI (emit like e3nn: api/e3ti) -----------------------
+# ----------------------- AutoAPI (emit like e3nn: api/mint) -----------------------
 import pathlib as _p
 autoapi_type = "python"
-autoapi_dirs = [str(_p.Path(__file__).resolve().parents[1] / "e3ti")]
+autoapi_dirs = [str(_p.Path(__file__).resolve().parents[1] / "mint")]
 autoapi_root = "api"                 # generates docs under docs/api/*
 autoapi_add_toctree_entry = True     # creates api/index and inserts toctree
 autoapi_python_class_content = "class"   # only this class' doc (no base __init__ doc)
@@ -61,7 +61,7 @@ default_role = "any"
 
 # -- linkcode (points to YOUR repo) -----------------------------------------
 GITHUB_USER = "winstonwinstonwinston"
-GITHUB_REPO = "E3TI"
+GITHUB_REPO = "mint"
 GITHUB_BRANCH = release if isinstance(release, str) else "main"
 
 def linkcode_resolve(domain, info):

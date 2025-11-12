@@ -1,4 +1,0 @@
-_target_: e3ti.interpolant.interpolants.TemporallyLinearInterpolant
-velocity_weight: 0.1
-denoiser_weight: 1.0
-gamma_weight: 0.1

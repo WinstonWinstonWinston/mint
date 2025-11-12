@@ -1,9 +1,0 @@
-_target_: e3ti.model.MLP.E3TIMLP
-
-in_dim: 2882
-hidden_dims: [1024, 512]
-out_dim: 132
-activation: relu
-use_input_bn: True
-affine: True
-track_running_stats: True

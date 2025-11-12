@@ -1,5 +1,0 @@
-root_dir: /users/1/sull1276/E3-Tensor-Interpolants/tests
-wandb_dir: ${paths.root_dir}/logs/wandb
-log_dir: ${paths.root_dir}/logs/hydra
-ckpt_dir: ${paths.log_dir}/ckpt
-data_dir: ${paths.root_dir}/../e3ti/data/ADP

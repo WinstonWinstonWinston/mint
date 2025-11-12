@@ -3,20 +3,20 @@ requires = ["setuptools>=69", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "e3ti"
+name = "mint"
 version = "0.1.0"
-description = "E3 Tensor Interpolants"
+description = "Molecular Interpolant using Neural Transporter"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = []
 
 [tool.setuptools]
-# We’re using the “flat” layout (no src/). Find the e3ti package + subpackages.
-packages = { find = { include = ["e3ti*"] } }
+# We’re using the “flat” layout (no src/). Find the mint package + subpackages.
+packages = { find = { include = ["mint*"] } }
 
-# Include non-.py files shipped under e3ti/data/** in the wheel
+# Include non-.py files shipped under mint/data/** in the wheel
 [tool.setuptools.package-data]
-e3ti = [
+mint = [
   "data/**/*",
 ]
 
