@@ -17,7 +17,6 @@ class MINTModule(LightningModule):
         self.model = hydra.utils.instantiate(cfg.model)
         self.interpolant = hydra.utils.instantiate(cfg.interpolant)
         # self.experiment = hydra.utils.instantiate(self.cfg.experiment)x``
-
         self.save_hyperparameters()
 
     def forward(self, batch):
@@ -86,7 +85,7 @@ class MINTModule(LightningModule):
         batch['z_irrep'] = Irreps("1o")
         batch = self.forward(batch)
         loss = self.interpolant.loss(*utils.batch2loss(batch))
-        self.log_dict({f"train/{k}": v for k, v in loss.items()},on_step=True, prog_bar=True, logger=True)
+        self.log_dict({f"train/{k}": v for k, v in loss.items()}, on_step=True, prog_bar=True, logger=True)
         return loss
 
     def validation_step(self, batch) -> dict[str, torch.Tensor]:

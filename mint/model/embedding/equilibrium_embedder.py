@@ -153,7 +153,7 @@ class MLPWithBN(nn.Module):
     :type track_running_stats: bool
     """
     def __init__(self, in_dim, hidden_dims=(128, 128), out_dim=1, activation='relu',
-                 use_input_bn=True, affine=True, track_running_stats=True):
+                 use_input_bn=False, affine=True, track_running_stats=True):
         super().__init__()
         layers = []
         if use_input_bn:

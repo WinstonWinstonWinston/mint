@@ -30,6 +30,7 @@ class MINTDatamodule(LightningDataModule):
             prefetch_factor=None if num_workers == 0 else self.prefetch_factor,
             pin_memory=False,
             persistent_workers=True if num_workers > 0 else False,
+            drop_last=True
         )
 
     def val_dataloader(self):
@@ -41,6 +42,7 @@ class MINTDatamodule(LightningDataModule):
             num_workers=num_workers,
             prefetch_factor=2,
             persistent_workers=True,
+            drop_last=True
         )
 
     def test_dataloader(self):
@@ -52,4 +54,5 @@ class MINTDatamodule(LightningDataModule):
             num_workers=num_workers,
             prefetch_factor=None if num_workers == 0 else self.prefetch_factor,
             persistent_workers=True,
+            drop_last=True
         )

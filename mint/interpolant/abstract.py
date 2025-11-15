@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 import torch
 from typing import Dict
-
+from tqdm.auto import tqdm
 
 class Corrector(ABC):
     r"""
@@ -260,14 +260,15 @@ class Interpolant(ABC):
         """
         return x_t + b*dt
 
-
+    @torch.no_grad()
     def integrate(
         self,
-        batch: Dict[str, torch.Tensor],
+        batch,
         model,
         dt: float,
         step_type: str = "sde",
         clip_val: float = 1e-3,
+        save_traj: bool = False,
         epsilon=lambda t: t,
     ) -> Dict[str, torch.Tensor]:
         r"""Integrate the (S)DE forward and save the trajectory of :math:`x_t`.
@@ -287,7 +288,7 @@ class Interpolant(ABC):
         where :math:`\xi \sim \mathcal N(0,I)`.
 
         :param batch: Mini-batch dict with at least ``'x'`` (current state).
-        :type batch: Dict[str, torch.Tensor]
+        :type batch: PyG Data
         :param model: Callable that maps/updates ``batch`` and provides fields like
                     ``'b'`` (and optionally ``'eta'``).
         :param dt: Time step :math:`\Delta t > 0`.
@@ -305,7 +306,7 @@ class Interpolant(ABC):
                     ``(num_steps+1, batch, ...)`` including the initial state.
                 - ``'t_grid'``: times used (shape ``(num_steps,)``).
                 - ``'x'``: final state (same as ``x_traj[-1]``).
-        :rtype: Dict[str, torch.Tensor]
+        :rtype: PyG Data
         """
         if dt <= 0:
             raise ValueError("dt must be positive.")
@@ -326,12 +327,16 @@ class Interpolant(ABC):
         is_ode = (step_type.lower() == "ode")
 
         # Store trajectory (include initial state before any step).
-        x_traj = [x_t.clone()]
+        if save_traj:
+            x_traj = [x_t.clone()]
 
         # Integrate forward in time.
-        for t_val in t_grid:
+        for t_val in tqdm(t_grid, desc="Integrating over time" ,leave=False, position=1):
             # Broadcast t to batch length
             t = t_val.repeat(B)
+
+            # set time in the batch
+            batch.t_interpolant = t
 
             # Run the model to compute drift for the current batch/state.
             batch = model(batch)
@@ -339,8 +344,8 @@ class Interpolant(ABC):
             # Drift term is required.
             b = batch["b"]
 
-            # Eta is optional; if missing, default to b.
-            eta = batch.get("eta", b)
+            # Eta is optional; if missing, default to zeros.
+            eta = batch.get("eta", torch.zeros_like(b))
 
             # Step according to the selected scheme.
             if is_ode:
@@ -350,16 +355,23 @@ class Interpolant(ABC):
 
             # Update batch and record the new state.
             batch["x"] = x_t
-            x_traj.append(x_t.clone())
+            if save_traj:
+                x_traj.append(x_t.clone())
 
         # Stack into a single tensor: (num_steps+1, batch, ...)
-        x_traj = torch.stack(x_traj, dim=0)
+        if save_traj:
+            x_traj = torch.stack(x_traj, dim=0)
 
+            return {
+                "x_traj": x_traj,
+                "t_grid": t_grid,
+                "x": x_traj[-1], # final state
+            }
+        
         return {
-            "x_traj": x_traj,
-            "t_grid": t_grid,
-            "x": x_traj[-1], # final state
-        }
+                "t_grid": t_grid,
+                "x": x_t, # final state
+            }
 
 class LinearInterpolant(Interpolant):
     r"""

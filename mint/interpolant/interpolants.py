@@ -15,6 +15,7 @@ class TemporallyLinearInterpolant(LinearInterpolant):
     def __init__(self, velocity_weight: float = 1.0, denoiser_weight: float = 1.0, gamma_weight = 1.0) -> None:
         super().__init__(velocity_weight, denoiser_weight)
         self.gamma_weight = gamma_weight
+    
     def alpha(self, t: torch.Tensor) -> torch.Tensor:
         r"""
         Alpha function :math:`\alpha(t) = (1-t)`.
