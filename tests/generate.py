@@ -2,10 +2,15 @@ from mint.state import MINTState
 from mint.data.ADP.ADP_dataset import ADPDataset
 from mint.module import MINTModule
 from mint.experiment.train import Train
+from mint.experiment.generate import Generate
 
 from omegaconf import OmegaConf
 import logging
 from pytorch_lightning.utilities.rank_zero import rank_zero_only
+import torch
+from torch_geometric.loader import DataLoader
+from torch.utils.data import Subset
+import parmed as pmd
 
 ds_train = ADPDataset(data_dir='/users/1/sull1276/mint/tests/../mint/data/ADP', 
                        data_proc_fname="AA", 
@@ -13,9 +18,9 @@ ds_train = ADPDataset(data_dir='/users/1/sull1276/mint/tests/../mint/data/ADP',
                        data_raw_fname="alanine-dipeptide-250ns-nowater", 
                        data_raw_ext=".xtc", 
                        split="train", 
-                       total_frames_train=25600, 
-                       total_frames_test=6400, 
-                       total_frames_valid=6400, 
+                       total_frames_train=25000, 
+                       total_frames_test=5000, 
+                       total_frames_valid=5000, 
                        lag= OmegaConf.create({"equilibrium": True}), 
                        normalize= OmegaConf.create({"bool": False, "t_dependent": False}), 
                        node_features= OmegaConf.create({"epsilon": True, "sigma": True, "charge": True, "mass": True}), 
@@ -27,9 +32,9 @@ ds_test = ADPDataset(data_dir='/users/1/sull1276/mint/tests/../mint/data/ADP',
                        data_raw_fname="alanine-dipeptide-250ns-nowater", 
                        data_raw_ext=".xtc", 
                        split="test", 
-                       total_frames_train=25600, 
-                       total_frames_test=6400, 
-                       total_frames_valid=6400, 
+                       total_frames_train=25000, 
+                       total_frames_test=5000, 
+                       total_frames_valid=5000, 
                        lag= OmegaConf.create({"equilibrium": True}), 
                        normalize= OmegaConf.create({"bool": False, "t_dependent": False}), 
                        node_features= OmegaConf.create({"epsilon": True, "sigma": True, "charge": True, "mass": True}), 
@@ -41,9 +46,9 @@ ds_valid = ADPDataset(data_dir='/users/1/sull1276/mint/tests/../mint/data/ADP',
                        data_raw_fname="alanine-dipeptide-250ns-nowater", 
                        data_raw_ext=".xtc", 
                        split="valid", 
-                       total_frames_train=25600, 
-                       total_frames_test=6400, 
-                       total_frames_valid=6400, 
+                       total_frames_train=25000, 
+                       total_frames_test=5000, 
+                       total_frames_valid=5000, 
                        lag= OmegaConf.create({"equilibrium": True}), 
                        normalize= OmegaConf.create({"bool": False, "t_dependent": False}), 
                        node_features= OmegaConf.create({"epsilon": True, "sigma": True, "charge": True, "mass": True}), 
@@ -60,7 +65,7 @@ module = MINTModule(
             "_target_": "mint.model.embedding.equilibrium_embedder.EquilibriumEmbedder",
             "use_ff": True,
             "interp_time": {
-                "embedding_dim": 256,
+                "embedding_dim": 64,
                 "max_positions": 1000,
             },
             "force_field": {
@@ -70,7 +75,7 @@ module = MINTModule(
                 "activation": "silu",
                 "use_input_bn": False,
                 "affine": False,
-                "track_running_stats": False,
+                "track_running_stats": True,
             },
             "atom_type": {
                 "num_types": 14,
@@ -79,36 +84,35 @@ module = MINTModule(
         },
         "model": {
             "_target_": "mint.model.equivariant.transformer.MultiSE3Transformer",
-            "input_channels": [[320], [0]],
+            "input_channels": [[128], [0]],
             "readout_channels": [[0, 0], [0, 1]],
-            "hidden_channels": [[128, 0, 32], [0, 64, 0]],
-            "hidden_channels_attn": [[32, 0, 8], [0, 16, 0]],
-            "hidden_channels_mlp": [[384, 0, 96], [0, 192, 0]],
-            "key_channels":    [[32, 0, 8], [0, 16, 0]],
-            "query_channels":  [[32, 0, 8], [0, 1, 0]],
-            "edge_l_max": 2,
-            "edge_basis": "gaussian",
-            "max_radius": 1000,
-            "number_of_basis": 128,
-            "hidden_size": 64,
-            "max_neighbors": 22,
-            "act": "leakyrelu",
-            "num_layers": 6,
+            "hidden_channels": [[32, 0, 32, 0], [0, 32, 0, 32]],
+            "key_channels":    [[32, 0, 32, 0], [0, 32, 0, 32]],
+            "query_channels":  [[32, 0, 32, 0], [0, 32, 0, 32]],
+            "edge_l_max": 3,
+            "edge_basis": "smooth_finite",
+            "max_radius": 10,
+            "number_of_basis": 64,
+            "hidden_size": 128,
+            "max_neighbors": 10000,
+            "act": "silu",
+            "num_layers": 4,
+            "bn": False,
         },
         "interpolant": {
             "_target_": "mint.interpolant.interpolants.TemporallyLinearInterpolant",
             "velocity_weight": 1.0,
             "denoiser_weight": 0.0,
-            "gamma_weight": 0.01,
+            "gamma_weight": 0.1,
         },
         "validation": {
             "stratified": False,
         },
         "optim": {
             "optimizer": {
-                "name": "AdamW",
-                "lr": 5e-4,
-                "weight_decay": 5e-3,
+                "name": "Adam",
+                "lr": 3e-4,
+                "weight_decay": 0.01,
                 "betas": [0.9, 0.999],
             },
             "scheduler": {
@@ -120,70 +124,95 @@ module = MINTModule(
     })
 )
 
-print(module)
-    
+ckpt = torch.load("logs/hydra/ckpt/epoch_33-step_2652-loss_-159373.4375.ckpt", map_location="cuda")
+module.load_state_dict(ckpt["state_dict"])
+
 st = MINTState(
     seed=42,
-    module=module,
+    module=module.to('cuda'),
     dataset_train=ds_train,
     dataset_valid=ds_valid,
     dataset_test=ds_test,
 )
 
-train_cfg = OmegaConf.create({
-    "trainer": {
-        "overfit_batches": 0,
-        "min_epochs": 1,
-        "max_epochs": 400,
-        "accelerator": "gpu",
-        "log_every_n_steps": 10,
-        "deterministic": False,
-        # "strategy": "ddp_notebook",
-        "val_check_interval": 1.0,
-        "check_val_every_n_epoch": 1,
-        "accumulate_grad_batches": 1,
-        "gradient_clip_val": 1.0,
-        "gradient_clip_algorithm": "norm",
-        "precision": "32-true",
-    },
-    "checkpointer": {
-        "dirpath": "/users/1/sull1276/mint/tests/logs/hydra/ckpt",
-        "save_last": True,
-        "save_top_k": 5,
-        "monitor": "val/loss",
-        "filename": "epoch_{epoch}-step_{step}-loss_{val/loss:.4f}",
-        "auto_insert_metric_name": False,
-        "mode": "min",
-    },
-    "wandb": {
-        "name": "mint",
-        "project": "mint",
-        "save_dir": "/users/1/sull1276/mint/tests/logs/wandb",
-    },
-    "wandb_watch": {
-        "log": "all",
-        "log_freq": 500,
-    },
-    "warm_start": None,
-    "warm_start_cfg_override": True,
-    "loader": {
-        "num_workers": 8,
-        "prefetch_factor": 2,
-        "batch_size": {
-            "train": 32,
-            "valid": 32,
-            "test": 32
-        },
-    },
-    "num_device": 1,
-    "project": {"name": "mint"}
-})
+print(module)
 
-logger = logging.getLogger(__name__)
-logging_levels = ("debug", "info", "warning", "error", "exception", "fatal", "critical")
-for level in logging_levels:
-    setattr(logger, level, rank_zero_only(getattr(logger, level)))
+
+subset = Subset(ds_test, range(64))
+
+test_loader = DataLoader(
+    subset,
+    batch_size=64,
+    shuffle=False,
+)
+
+def epsilon_fn(t):
+    return t
     
-trainer = Train(st, train_cfg, logger)
+generate_cfg = OmegaConf.create(
+    {   "dt": 1e-2,
+        "step_type": "ode", # or "sde"
+        "clip_val": 1e-3,
+        "save_traj": False
+    }
+)
 
-trainer.run()
+gen_experiment = Generate(state=st, cfg=generate_cfg, batches = test_loader, epsilon=epsilon_fn)
+
+with torch.no_grad():
+    samples = gen_experiment.run()
+
+X = [sample['x'] for sample in samples]
+X = torch.stack(X)
+print(X.size())
+
+X = [sample['x'] for sample in samples]
+X = torch.stack(X)
+B, N, C = X.shape              # B = 5, N = 1408, C = 3
+nodes = 22
+
+T = (B * N) // nodes           # total number of graphs T
+X = X.view(-1, nodes, C)  # shape [T, 22, 3]
+
+def save_xyz(
+    trajectory: torch.Tensor,
+    atomic_numbers: list[int] | torch.Tensor,
+    prefix: str = "output",
+):
+    """
+    Save a trajectory of shape (steps, B, N, 3) as one XYZ file per batch,
+    using atomic numbers for proper element symbols.
+
+    Parameters
+    ----------
+    trajectory : torch.Tensor
+        Tensor of shape (steps, B, N, 3)
+    atomic_numbers : list[int] or torch.Tensor
+        Atomic numbers of shape (N,)
+    prefix : str
+        Output file prefix; files will be named '{prefix}_{b}.xyz'
+    """
+    B, N, _ = trajectory.shape
+
+    if isinstance(atomic_numbers, torch.Tensor):
+        atomic_numbers = atomic_numbers.tolist()
+
+    # Periodic table mapping for atomic numbers 1–20, fallback to "X"
+    periodic_table = { 0: "H",
+        1: "H",  2: "He", 3: "Li", 4: "Be", 5: "B",  6: "C",  7: "N",  8: "O",  9: "F", 10: "Ne",
+        11: "Na",12: "Mg",13: "Al",14: "Si",15: "P",16: "S",17: "Cl",18: "Ar",19: "K", 20: "Ca",
+    }
+
+    symbols = [periodic_table.get(z, "X") for z in atomic_numbers]
+    with open(f"{prefix}.xyz", "w") as f:
+        for b in range(B):
+            f.write(f"{N}\n")
+            f.write(f"Frame {b}\n")
+            for atom in range(N):
+                x, y, z = trajectory[b, atom]
+                symbol = symbols[atom]
+                f.write(f"{symbol} {x:.3f} {y:.3f} {z:.3f}\n")
+
+atomic_numbers = [a.atomic_number for a in pmd.load_file("../mint/data/ADP/alanine-dipeptide-nowater.pdb").atoms]
+
+save_xyz(X,atomic_numbers)

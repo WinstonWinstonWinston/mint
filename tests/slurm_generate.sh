@@ -3,7 +3,7 @@
 #SBATCH -o slurm-%j.out
 #SBATCH -e slurm-%j.err
 #SBATCH -p interactive-gpu
-#SBATCH -t 12:00:00
+#SBATCH -t 04:00:00
 #SBATCH -N 1
 #SBATCH --ntasks-per-node=1           # ONE task (one Python process)
 #SBATCH --cpus-per-task=8             # CPUs for DataLoader workers
@@ -27,4 +27,4 @@ module load ompi/3.1.6/gnu-8.2.0
 module load cuda/11.8.0-gcc-7.2.0-xqzqlf2
 
 # Launch exactly one Python process bound to this GPU
-srun -n 1 python test.py
+srun -n 1 python generate.py
