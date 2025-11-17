@@ -18,11 +18,11 @@ ds_train = ADPDataset(data_dir='/users/1/sull1276/mint/tests/../mint/data/ADP',
                        data_raw_fname="alanine-dipeptide-250ns-nowater", 
                        data_raw_ext=".xtc", 
                        split="train", 
-                       total_frames_train=25000, 
-                       total_frames_test=5000, 
-                       total_frames_valid=5000, 
+                       total_frames_train=25600, 
+                       total_frames_test=6400, 
+                       total_frames_valid=6400, 
                        lag= OmegaConf.create({"equilibrium": True}), 
-                       normalize= OmegaConf.create({"bool": False, "t_dependent": False}), 
+                       normalize= OmegaConf.create({"bool": True, "t_dependent": False}), 
                        node_features= OmegaConf.create({"epsilon": True, "sigma": True, "charge": True, "mass": True}), 
                        augement_rotations=False)
 
@@ -32,11 +32,11 @@ ds_test = ADPDataset(data_dir='/users/1/sull1276/mint/tests/../mint/data/ADP',
                        data_raw_fname="alanine-dipeptide-250ns-nowater", 
                        data_raw_ext=".xtc", 
                        split="test", 
-                       total_frames_train=25000, 
-                       total_frames_test=5000, 
-                       total_frames_valid=5000, 
+                       total_frames_train=25600, 
+                       total_frames_test=6400, 
+                       total_frames_valid=6400, 
                        lag= OmegaConf.create({"equilibrium": True}), 
-                       normalize= OmegaConf.create({"bool": False, "t_dependent": False}), 
+                       normalize= OmegaConf.create({"bool": True, "t_dependent": False}), 
                        node_features= OmegaConf.create({"epsilon": True, "sigma": True, "charge": True, "mass": True}), 
                        augement_rotations=False)
 
@@ -46,11 +46,11 @@ ds_valid = ADPDataset(data_dir='/users/1/sull1276/mint/tests/../mint/data/ADP',
                        data_raw_fname="alanine-dipeptide-250ns-nowater", 
                        data_raw_ext=".xtc", 
                        split="valid", 
-                       total_frames_train=25000, 
-                       total_frames_test=5000, 
-                       total_frames_valid=5000, 
+                       total_frames_train=25600, 
+                       total_frames_test=6400, 
+                       total_frames_valid=6400, 
                        lag= OmegaConf.create({"equilibrium": True}), 
-                       normalize= OmegaConf.create({"bool": False, "t_dependent": False}), 
+                       normalize= OmegaConf.create({"bool": True, "t_dependent": False}), 
                        node_features= OmegaConf.create({"epsilon": True, "sigma": True, "charge": True, "mass": True}), 
                        augement_rotations=False)
 
@@ -59,13 +59,13 @@ module = MINTModule(
         "prior": {
             "_target_": "mint.prior.normal.NormalPrior",
             "mean": 0.0,
-            "std": 0.25,
+            "std": 1.0,
         },
         "embedder": {
             "_target_": "mint.model.embedding.equilibrium_embedder.EquilibriumEmbedder",
             "use_ff": True,
             "interp_time": {
-                "embedding_dim": 64,
+                "embedding_dim": 256,
                 "max_positions": 1000,
             },
             "force_field": {
@@ -75,7 +75,7 @@ module = MINTModule(
                 "activation": "silu",
                 "use_input_bn": False,
                 "affine": False,
-                "track_running_stats": True,
+                "track_running_stats": False,
             },
             "atom_type": {
                 "num_types": 14,
@@ -84,35 +84,36 @@ module = MINTModule(
         },
         "model": {
             "_target_": "mint.model.equivariant.transformer.MultiSE3Transformer",
-            "input_channels": [[128], [0]],
+            "input_channels": [[320], [0]],
             "readout_channels": [[0, 0], [0, 1]],
-            "hidden_channels": [[32, 0, 32, 0], [0, 32, 0, 32]],
-            "key_channels":    [[32, 0, 32, 0], [0, 32, 0, 32]],
-            "query_channels":  [[32, 0, 32, 0], [0, 32, 0, 32]],
-            "edge_l_max": 3,
-            "edge_basis": "smooth_finite",
-            "max_radius": 10,
-            "number_of_basis": 64,
-            "hidden_size": 128,
-            "max_neighbors": 10000,
-            "act": "silu",
-            "num_layers": 4,
-            "bn": False,
+            "hidden_channels": [[128, 0], [0, 64]],
+            "hidden_channels_attn": [[32, 0], [0, 16]],
+            "hidden_channels_mlp": [[384, 0], [0, 192]],
+            "key_channels":    [[32, 0], [0, 16]],
+            "query_channels":  [[32, 0], [0, 16]],
+            "edge_l_max": 2,
+            "edge_basis": "gaussian",
+            "max_radius": 1000,
+            "number_of_basis": 128,
+            "hidden_size": 64,
+            "max_neighbors": 1000,
+            "act": "leakyrelu",
+            "num_layers": 6,
         },
         "interpolant": {
             "_target_": "mint.interpolant.interpolants.TemporallyLinearInterpolant",
             "velocity_weight": 1.0,
-            "denoiser_weight": 0.0,
-            "gamma_weight": 0.1,
+            "denoiser_weight": 1.0,
+            "gamma_weight": 0,
         },
         "validation": {
             "stratified": False,
         },
         "optim": {
             "optimizer": {
-                "name": "Adam",
-                "lr": 3e-4,
-                "weight_decay": 0.01,
+                "name": "AdamW",
+                "lr": 5e-4,
+                "weight_decay": 5e-3,
                 "betas": [0.9, 0.999],
             },
             "scheduler": {
@@ -124,7 +125,7 @@ module = MINTModule(
     })
 )
 
-ckpt = torch.load("logs/hydra/ckpt/epoch_33-step_2652-loss_-159373.4375.ckpt", map_location="cuda")
+ckpt = torch.load("logs/hydra/ckpt/epoch_16-step_13600-loss_-610912.4375.ckpt", map_location="cuda")
 module.load_state_dict(ckpt["state_dict"])
 
 st = MINTState(
@@ -136,7 +137,6 @@ st = MINTState(
 )
 
 print(module)
-
 
 subset = Subset(ds_test, range(64))
 
@@ -150,7 +150,7 @@ def epsilon_fn(t):
     return t
     
 generate_cfg = OmegaConf.create(
-    {   "dt": 1e-2,
+    {   "dt": 1e-3,
         "step_type": "ode", # or "sde"
         "clip_val": 1e-3,
         "save_traj": False
