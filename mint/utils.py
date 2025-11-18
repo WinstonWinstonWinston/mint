@@ -8,7 +8,7 @@ from e3nn import o3
 from torch import Tensor
 
 def batch2loss(batch,stratified=False):
-    return batch['t_interpolant'][batch.batch][:,None], batch['x_base'], batch['x'], batch['z'],batch['b'],batch['eta']
+    return batch['t_interpolant'][batch.batch][:,None], batch['x_base'], batch['x'], batch['z'], batch['b'],batch['eta']
 
 def batch2interp(batch):
     return batch['t_interpolant'][batch.batch][:,None], batch['x_base'], batch['x']
@@ -67,6 +67,7 @@ def parse_activation(spec: str) -> torch.nn.Module:
 
     simple = {
         'relu':   lambda: nn.ReLU(inplace=True),
+        'leakyrelu':   lambda: nn.LeakyReLU(inplace=True),
         'gelu':   nn.GELU,
         'silu':   nn.SiLU,
         'swish':  nn.SiLU,
@@ -184,3 +185,44 @@ def combine_features(
         irreps_cat = irreps_new             # switch to canonical form
 
     return tensor_cat, irreps_cat
+
+def save_xyz(
+    trajectory: torch.Tensor,
+    atomic_numbers: list[int] | torch.Tensor,
+    prefix: str = "output",
+):
+    """
+    Save a trajectory of shape (steps, B, N, 3) as one XYZ file per batch,
+    using atomic numbers for proper element symbols.
+
+    Parameters
+    ----------
+    trajectory : torch.Tensor
+        Tensor of shape (steps, B, N, 3)
+    atomic_numbers : list[int] or torch.Tensor
+        Atomic numbers of shape (N,)
+    prefix : str
+        Output file prefix; files will be named '{prefix}_{b}.xyz'
+    """
+    steps, B, N, _ = trajectory.shape
+
+    if isinstance(atomic_numbers, torch.Tensor):
+        atomic_numbers = atomic_numbers.tolist()
+
+    # Periodic table mapping for atomic numbers 1–20, fallback to "X"
+    periodic_table = { 0: "H",
+        1: "H",  2: "He", 3: "Li", 4: "Be", 5: "B",  6: "C",  7: "N",  8: "O",  9: "F", 10: "Ne",
+        11: "Na",12: "Mg",13: "Al",14: "Si",15: "P",16: "S",17: "Cl",18: "Ar",19: "K", 20: "Ca",
+    }
+
+    symbols = [periodic_table.get(z, "X") for z in atomic_numbers]
+
+    for b in range(B):
+        with open(f"{prefix}_{b}.xyz", "w") as f:
+            for step in range(steps):
+                f.write(f"{N}\n")
+                f.write(f"Frame {step}\n")
+                for atom in range(N):
+                    x, y, z = trajectory[step, b, atom]
+                    symbol = symbols[atom]
+                    f.write(f"{symbol} {x:.3f} {y:.3f} {z:.3f}\n")

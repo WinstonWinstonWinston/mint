@@ -48,27 +48,36 @@ class MINTDataset(Dataset):
         # dir + name + split + ext
         processed_path = data_dir+"/"+data_proc_fname+"_"+split+data_proc_ext
         raw_path = data_dir+"/"+data_raw_fname+"_"+split+data_raw_ext
-
-        # check if processed data exists
-        if os.path.exists(processed_path):
-            pass
-        else:
-            # if not use preprocess from child 
-            print(f"INFO:: No processed data found at {processed_path}... preprocessing data")
-            self.processed_data = self._preprocess(raw_path, processed_path)
-
-        # # processed data exists now, save it.
-        # print(f"INFO:: Loading processed data from {processed_path}")
-        # # with gzip.open(processed_path, 'rb') as f:
-        # #     self.processed_data = pickle.load(f) # type: ignore
-
-        # with open(processed_path, "rb") as raw:
-        #     with zstd.ZstdDecompressor().stream_reader(raw) as f:
-        #         self.processed_data = pickle.load(f)
-
+        
+        self.processed_data = self._preprocess(raw_path, processed_path)
+        self.meta_keys = []
 # --------------------------------- preprocessing methods ---------------------------------
 #       The methods in this section are built to preprocess a trajectory dataset.
 #       Preprocessing should only occur once after cloning the repo.
+
+    def make_split_indices(self, num_frames,
+                       n_train,
+                       n_valid,
+                       n_test,
+                       seed: int = 0):
+        # one global random permutation
+        perm = torch.randperm(num_frames)
+
+        assert n_train + n_valid + n_test <= num_frames
+
+        idx = {}
+        start = 0
+        for split, n in [
+            ("train", n_train),
+            ("valid", n_valid),
+            ("test",  n_test),
+        ]:
+            end = start + n
+            idx[split] = perm[start:end]
+            start = end
+
+        return idx  # dict: {"train": tensor(...), "valid": ..., "test": ...}
+
 
     def _preprocess_traj_equilibrium(self, traj) -> tuple[Tensor, Tensor, Tensor]:
         """
@@ -85,12 +94,21 @@ class MINTDataset(Dataset):
         """
 
         # grab unique frames from dataset
-        n_frames = getattr(self, f"total_frames_{self.split}")
+        num_frames = len(traj)
+        split_indices = self.make_split_indices(
+            num_frames,
+            n_train=getattr(self, "total_frames_train"),
+            n_valid=getattr(self, "total_frames_valid"),
+            n_test=getattr(self, "total_frames_test"),
+            seed=42,  # or any fixed/int seed
+        )
 
-        assert n_frames < len(traj)
-        
-        # shuffle the frames and grab a random subset
-        frame_idx = torch.randperm(len(traj))[:n_frames]
+        n_frames = getattr(self, f"total_frames_{self.split}")
+        assert n_frames <= len(traj)
+
+        frame_idx = split_indices[self.split]
+        assert frame_idx.numel() == n_frames
+
         frames = torch.tensor(traj.center_coordinates().xyz[frame_idx])
 
         # compute normalization

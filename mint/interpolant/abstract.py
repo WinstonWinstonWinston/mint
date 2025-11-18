@@ -155,11 +155,10 @@ class Interpolant(ABC):
         :rtype: torch.Tensor
         """
         raise NotImplementedError
-
-    def loss(self, t, x_0, x_1, z, b, eta=None) -> Dict[str, torch.Tensor]:
+    
+    def loss(self, t, x_0, x_1, z, b, eta) -> Dict[str, torch.Tensor]:
         r"""
-        Loss value for a batch of data. If the eta term is None this corresponds only to the velocity loss.
-        Otherwise it gives a weighted average between them based off of init params velocity_weight, and denoiser_weight.
+        Loss value for a batch of data. It gives a weighted average between them based off of init params velocity_weight, and denoiser_weight.
 
         * :math:`\mathcal{L}_{\text{velocity}}(\theta) = \mathbb{E}\!\left[\|b\|^{2} - 2\, b \cdot \dot I\right]`
         * :math:`\mathcal{L}_{\text{denoiser}}(\theta) = \mathbb{E}\!\left[\|\eta\|^{2} - 2\, \eta \cdot z\right]`
@@ -190,7 +189,7 @@ class Interpolant(ABC):
         """
         interpolant_dot = self.interpolate_derivative(t,x_0,x_1,z)
         loss_velocity  = torch.mean(torch.einsum('BD,BD->B', b, b    ) - 2*torch.einsum('BD, BD', b, interpolant_dot))
-        loss_denoiser  = torch.mean(torch.einsum('BD,BD->B', eta, eta) - 2*torch.einsum('BD, BD', eta, z) if eta is not None else torch.zeros_like(loss_velocity))
+        loss_denoiser  = torch.mean(torch.einsum('BD,BD->B', eta, eta) - 2*torch.einsum('BD, BD', eta, z))
         loss = (self.velocity_weight*loss_velocity + self.denoiser_weight*loss_denoiser)/(self.velocity_weight + self.denoiser_weight)
         return {"loss": loss,
                 "loss_velocity": loss_velocity,
@@ -230,8 +229,8 @@ class Interpolant(ABC):
         """
         return (
             x_t                                                     # Previous state
-            + (b - epsilon(t) * eta / self.gamma(t)) * dt           # drift
-            + (2 * epsilon(t) * dt) ** 0.5 * torch.randn_like(x_t)  # volatility
+            + (b - epsilon(t)[:,None] * eta / self.gamma(t)[:,None]) * dt           # drift
+            + (2 * epsilon(t)[:,None]* dt) ** 0.5 * torch.randn_like(x_t)  # volatility
         )
 
     def step_ode(self, x_t: torch.Tensor, b:torch.Tensor, dt:float) -> torch.Tensor:
@@ -336,7 +335,7 @@ class Interpolant(ABC):
             t = t_val.repeat(B)
 
             # set time in the batch
-            batch.t_interpolant = t
+            batch['t_interpolant'] = t
 
             # Run the model to compute drift for the current batch/state.
             batch = model(batch)
@@ -345,13 +344,17 @@ class Interpolant(ABC):
             b = batch["b"]
 
             # Eta is optional; if missing, default to zeros.
-            eta = batch.get("eta", torch.zeros_like(b))
+            eta =batch["eta"]
+
+            if torch.any(torch.isnan(b)):
+                print(t_val)
+                return {"x":x_t}
 
             # Step according to the selected scheme.
             if is_ode:
                 x_t = self.step_ode(x_t, b, dt)
             else:
-                x_t = self.step_sde(x_t, b, eta, t, dt, epsilon)
+                x_t = self.step_sde(x_t, b, eta, t[batch.batch], dt, epsilon)
 
             # Update batch and record the new state.
             batch["x"] = x_t
@@ -369,7 +372,6 @@ class Interpolant(ABC):
             }
         
         return {
-                "t_grid": t_grid,
                 "x": x_t, # final state
             }
 

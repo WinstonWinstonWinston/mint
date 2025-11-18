@@ -21,11 +21,13 @@ class Generate(Experiment):
         samples =[]
         for batch in tqdm(self.batches, desc="Generating samples", position=0, dynamic_ncols=True):
             # Sample from the base distribution
+            batch = batch.to(self.state.module.device)
             batch = self.state.module.prior.sample(batch, stratified=False)
             # Overwrite state with base sample
-            batch['x'] = batch['x_base']
+            batch['x_target'] = batch['x']
+            batch['x_t'] = batch['x_base']
             # Forward integrate batch
-            integrated_batch = self.state.module.interpolant.integrate( batch,
+            integrated_batch = self.state.module.interpolant.integrate(batch,
                                                         self.state.module,
                                                         self.generate_cfg.dt,
                                                         self.generate_cfg.step_type,

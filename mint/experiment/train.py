@@ -28,7 +28,7 @@ class Train(Experiment):
         self.state = state
 
         self.datamodule =  MINTDatamodule(**self.loader_cfg,
-                                            train_dataset = state.dataset_test, 
+                                            train_dataset = state.dataset_train, 
                                             valid_dataset = state.dataset_valid, 
                                             test_dataset  = state.dataset_test)
         

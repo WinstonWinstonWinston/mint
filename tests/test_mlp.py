@@ -54,7 +54,7 @@ ds_valid = ADPDataset(data_dir='/users/1/sull1276/mint/tests/../mint/data/ADP',
                        node_features= OmegaConf.create({"epsilon": True, "sigma": True, "charge": True, "mass": True}), 
                        augement_rotations=False)
 
-max_epochs = 20
+max_epochs = 200
 
 module = EquivariantMINTModule(
     cfg=OmegaConf.create({
@@ -76,9 +76,6 @@ module = EquivariantMINTModule(
                 "hidden_dims": [128, 64],
                 "out_dim": 32,
                 "activation": "silu",
-                "use_input_bn": False,
-                "affine": False,
-                "track_running_stats": False,
             },
             "atom_type": {
                 "num_types": 14,
@@ -86,23 +83,11 @@ module = EquivariantMINTModule(
             },
         },
         "model": {
-            "_target_": "mint.model.equivariant.PaINNLike.PaiNNLikeInterpolantNet",
-            "irreps_input":        [[320  ], [0    ]],
-            "irreps":              [[32, 0], [0, 32]],
-            "irreps_readout_cond": [[32, 0], [0, 32]],
-            "irreps_readout":      [[0, 0],  [0, 1 ]],
-            "edge_l_max": 1,
-            "max_radius": 1000,
-            "max_neighbors": 1000,
-            "number_of_basis": 64,
-            "edge_basis": "gaussian",
-            "mlp_act": "silu",
-            "mlp_drop": 0,
-            "conv_weight_layers": [192],
-            "update_weight_layers": [128],
-            "message_update_count_cond": 4,
-            "message_update_count_eta": 2,
-            "message_update_count_b": 2,
+             "_target_": "mint.model.MLP.MINTMLP",
+             "in_dim": 22*320+22*3,
+             "hidden_dims": (4096, 1024),
+             "out_dim": 22*3,
+             "activation": "silu",
         },
         "interpolant": {
             "_target_": "mint.interpolant.interpolants.TemporallyLinearInterpolant",
@@ -139,7 +124,7 @@ st = MINTState(
 )
 
 eqv_test_cfg = OmegaConf.create({"split":"train",
-                                 "batch_size":3,
+                                 "batch_size": 3,
                                  "number_of_trials":5,
                                  "tolerance_dict": {"x": 1e-6,
                                                     "charge":1e-6,

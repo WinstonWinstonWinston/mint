@@ -14,10 +14,11 @@ class NormalPrior(MINTPrior):
     :type cfg: Any
     """
 
-    def __init__(self, mean:float, std: float) -> None:
+    def __init__(self, mean:float, std: float, antithetic = False) -> None:
         super().__init__()
         self.std = std
         self.mean = mean
+        self.antithetic = antithetic
 
     def sample(self, batch: Data, stratified: bool = False) -> Data:
         """
@@ -37,12 +38,30 @@ class NormalPrior(MINTPrior):
         x_base = torch.randn_like(batch['x'])*self.std + self.mean
         B = max(batch['batch']) + 1 # shift by 1, zero indexing
         device = batch['x'].device
-        t_interpolant = torch.rand(B, device=device) if not stratified else torch.cat([(i + torch.rand(B//4 + (i < B%4), device=device))/4 for i in range(4)])
+        if self.antithetic:
+            if not stratified:
+                # number of independent t's we need (each generates a pair t, 1 - t)
+                n_pairs = (B + 1) // 2
+                t_base = torch.rand(n_pairs, device=device)
+            else:
+                n_pairs = (B + 1) // 2
+                # stratified sampling in [0, 1] for n_pairs values
+                t_base = torch.cat([
+                    (i + torch.rand(n_pairs // 4 + (i < n_pairs % 4), device=device)) / 4
+                    for i in range(4)
+                ])[:n_pairs]
+
+            # make pairs (t, 1 - t)
+            t_interpolant = torch.cat([t_base, 1.0 - t_base], dim=0)[:B]
+
+        else:
+            t_interpolant = torch.rand(B, device=device) if not stratified else torch.cat([(i + torch.rand(B//4 + (i < B%4), device=device))/4 for i in range(4)])
+
 
         batch['x_base'] = x_base
         batch['x_base_irrep'] = Irreps("1o")
+        batch['feature_keys'].add("x_base")
         batch['t_interpolant'] = t_interpolant
-        batch['t_interpolant_irrep'] = Irreps("0e")
         return batch
 
     def log_prob(self, batch: Data) -> Tensor:

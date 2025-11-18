@@ -1,12 +1,15 @@
 from mint.state import MINTState
 from mint.data.ADP.ADP_dataset import ADPDataset
 from mint.module import EquivariantMINTModule
-from mint.experiment.train import Train
 from mint.experiment.equivariance_test import EquivarianceTest
-
+from mint.experiment.generate import Generate
+from torch.utils.data import DataLoader
+from mint.data.loader import make_meta_collate
 from omegaconf import OmegaConf
-import logging
-from pytorch_lightning.utilities.rank_zero import rank_zero_only
+from torch.utils.data import Subset
+import torch
+import parmed as pmd
+from torch_geometric.utils import to_dense_batch
 
 total_frames_train = 25600
 total_frames_test = 6400
@@ -54,7 +57,7 @@ ds_valid = ADPDataset(data_dir='/users/1/sull1276/mint/tests/../mint/data/ADP',
                        node_features= OmegaConf.create({"epsilon": True, "sigma": True, "charge": True, "mass": True}), 
                        augement_rotations=False)
 
-max_epochs = 20
+max_epochs = 200
 
 module = EquivariantMINTModule(
     cfg=OmegaConf.create({
@@ -76,9 +79,6 @@ module = EquivariantMINTModule(
                 "hidden_dims": [128, 64],
                 "out_dim": 32,
                 "activation": "silu",
-                "use_input_bn": False,
-                "affine": False,
-                "track_running_stats": False,
             },
             "atom_type": {
                 "num_types": 14,
@@ -86,23 +86,11 @@ module = EquivariantMINTModule(
             },
         },
         "model": {
-            "_target_": "mint.model.equivariant.PaINNLike.PaiNNLikeInterpolantNet",
-            "irreps_input":        [[320  ], [0    ]],
-            "irreps":              [[32, 0], [0, 32]],
-            "irreps_readout_cond": [[32, 0], [0, 32]],
-            "irreps_readout":      [[0, 0],  [0, 1 ]],
-            "edge_l_max": 1,
-            "max_radius": 1000,
-            "max_neighbors": 1000,
-            "number_of_basis": 64,
-            "edge_basis": "gaussian",
-            "mlp_act": "silu",
-            "mlp_drop": 0,
-            "conv_weight_layers": [192],
-            "update_weight_layers": [128],
-            "message_update_count_cond": 4,
-            "message_update_count_eta": 2,
-            "message_update_count_b": 2,
+             "_target_": "mint.model.MLP.MINTMLP",
+             "in_dim": 22*320+22*3,
+             "hidden_dims": (4096, 1024),
+             "out_dim": 22*3,
+             "activation": "silu",
         },
         "interpolant": {
             "_target_": "mint.interpolant.interpolants.TemporallyLinearInterpolant",
@@ -128,7 +116,9 @@ module = EquivariantMINTModule(
     })
 )
 
-print(module)
+ckpt = torch.load("logs/hydra/ckpt/epoch_194-step_39000-loss_-11876287.0000.ckpt", map_location="cuda")
+module.load_state_dict(ckpt["state_dict"])
+
     
 st = MINTState(
     seed=42,
@@ -139,7 +129,7 @@ st = MINTState(
 )
 
 eqv_test_cfg = OmegaConf.create({"split":"train",
-                                 "batch_size":3,
+                                 "batch_size": 3,
                                  "number_of_trials":5,
                                  "tolerance_dict": {"x": 1e-6,
                                                     "charge":1e-6,
@@ -183,80 +173,81 @@ for k, v in sorted(results.items()):
     print(row_fmt.format(k, status, mean, std, max_, tol, nb, na))
 
 
-train_cfg = OmegaConf.create({
-    "trainer": {
-        "overfit_batches": 0,
-        "min_epochs": 1,
-        "max_epochs": max_epochs,
-        "accelerator": "gpu",
-        "log_every_n_steps": 10,
-        "deterministic": False,
-        # "strategy": "ddp_notebook",
-        "val_check_interval": 1.0,
-        "check_val_every_n_epoch": 1,
-        "accumulate_grad_batches": 1,
-        "gradient_clip_val": 1.0,
-        "gradient_clip_algorithm": "norm",
-        "precision": "32-true",
-    },
-    "checkpointer": {
-        "dirpath": "/users/1/sull1276/mint/tests/logs/hydra/ckpt",
-        "save_last": True,
-        "save_top_k": 5,
-        "monitor": "val/loss",
-        "filename": "epoch_{epoch}-step_{step}-loss_{val/loss:.4f}",
-        "auto_insert_metric_name": False,
-        "mode": "min",
-    },
-    "wandb": {
-        "name": "mint",
-        "project": "mint",
-        "save_dir": "/users/1/sull1276/mint/tests/logs/wandb",
-    },
-    "wandb_watch": {
-        "log": "all",
-        "log_freq": 500,
-    },
-    "warm_start": None,
-    "warm_start_cfg_override": True,
-    "loader": {
-        "num_workers": 8,
-        "prefetch_factor": 2,
-        "batch_size": {
-            "train": 128,
-            "valid": 128,
-            "test": 128
-        },
-    },
-    "num_device": 1,
-    "project": {"name": "mint"}
-})
+print(module)
 
-logger = logging.getLogger(__name__)
+subset = Subset(ds_test, range(64))
 
-logging_levels = ("debug", "info", "warning", "error", "exception", "fatal", "critical")
-for level in logging_levels:
-    setattr(logger, level, rank_zero_only(getattr(logger, level)))
+loader = DataLoader(
+    subset,
+    shuffle=False,
+    batch_size=64,
+    collate_fn = make_meta_collate(ds_train.meta_keys)
+)
+
+def epsilon_fn(t):
+    return torch.ones_like(t)*0.1
     
-trainer = Train(st, train_cfg, logger)
+generate_cfg = OmegaConf.create(
+    {   "dt": 1e-3,
+        "step_type": "ode", # or "sde"
+        "clip_val": 1e-3,
+        "save_traj": False
+    }
+)
 
-trainer.run()
+gen_experiment = Generate(state=st, cfg=generate_cfg, batches = loader, epsilon=epsilon_fn)
 
-results = eqv_test.run()
-row_fmt = "{:<15} {:<6} {:>10} {:>10} {:>10} {:>10} {:>14} {:>14}"
-# header
-print(row_fmt.format(
-    "name", "status", "mean", "std", "max", "tol", "norm_before", "norm_after"
-))
-print("-" * 96)
-# rows
-for k, v in sorted(results.items()):
-    mean = f"{v['mean'].item():.4g}"
-    std = f"{v['std'].item():.4g}"
-    max_ = f"{v['max'].item():.4g}"
-    tol = f"{v['tol'].item():.4g}"
-    nb = f"{v['norm_before'].item():.4g}"
-    na = f"{v['norm_after'].item():.4g}"
-    status = "OK" if v["all_true"].item() else "FAIL"
+with torch.no_grad():
+    samples = gen_experiment.run()
 
-    print(row_fmt.format(k, status, mean, std, max_, tol, nb, na))
+X = [sample['x'] for sample in samples]
+
+for b in loader:
+    batch = b['batch']
+    break
+
+sample = X[0]
+sample_dense, mask = to_dense_batch(sample,batch)
+
+def save_xyz(
+    trajectory: torch.Tensor,
+    atomic_numbers: list[int] | torch.Tensor,
+    prefix: str = "output",
+):
+    """
+    Save a trajectory of shape (steps, B, N, 3) as one XYZ file per batch,
+    using atomic numbers for proper element symbols.
+
+    Parameters
+    ----------
+    trajectory : torch.Tensor
+        Tensor of shape (steps, B, N, 3)
+    atomic_numbers : list[int] or torch.Tensor
+        Atomic numbers of shape (N,)
+    prefix : str
+        Output file prefix; files will be named '{prefix}_{b}.xyz'
+    """
+    B, N, _ = trajectory.shape
+
+    if isinstance(atomic_numbers, torch.Tensor):
+        atomic_numbers = atomic_numbers.tolist()
+
+    # Periodic table mapping for atomic numbers 1–20, fallback to "X"
+    periodic_table = { 0: "H",
+        1: "H",  2: "He", 3: "Li", 4: "Be", 5: "B",  6: "C",  7: "N",  8: "O",  9: "F", 10: "Ne",
+        11: "Na",12: "Mg",13: "Al",14: "Si",15: "P",16: "S",17: "Cl",18: "Ar",19: "K", 20: "Ca",
+    }
+
+    symbols = [periodic_table.get(z, "X") for z in atomic_numbers]
+    with open(f"{prefix}.xyz", "w") as f:
+        for b in range(B):
+            f.write(f"{N}\n")
+            f.write(f"Frame {b}\n")
+            for atom in range(N):
+                x, y, z = trajectory[b, atom]
+                symbol = symbols[atom]
+                f.write(f"{symbol} {x:.3f} {y:.3f} {z:.3f}\n")
+
+atomic_numbers = [a.atomic_number for a in pmd.load_file("../mint/data/ADP/alanine-dipeptide-nowater.pdb").atoms]
+
+save_xyz(sample_dense,atomic_numbers)

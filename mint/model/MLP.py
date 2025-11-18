@@ -3,7 +3,8 @@ import torch
 from torch import nn
 from e3nn.o3 import Irreps
 from torch_geometric.data import Data
-from mint.model.embedding.equilibrium_embedder import MLPWithBN
+from mint.model.embedding.equilibrium_embedder import MLP
+from torch_geometric.utils import to_dense_batch
 
 class MINTMLP(nn.Module):
     r"""
@@ -35,49 +36,52 @@ class MINTMLP(nn.Module):
                  use_input_bn=True, affine=True, track_running_stats=True):
 
         super().__init__()
-        self.half_dim = int(out_dim/2)
-        self.net = MLPWithBN(
+        self.out_dim = out_dim
+        self.net = MLP(
                 in_dim=in_dim,
                 hidden_dims=hidden_dims,
-                out_dim=out_dim,
-                activation=activation,
-                use_input_bn=use_input_bn,
-                affine=affine,
-                track_running_stats=track_running_stats,
+                out_dim=2*out_dim,
+                activation=activation
             )
 
     def forward(self, batch: Data) -> Data:
         r"""
-        Apply the MLP to inputs. Cats batch['x'] and batch['f']
+        Apply the MLP to inputs. Cats batch['x_t'] and batch['f']
 
         :param batch:
-            PyG data object with 'x' and 'f'.
+            PyG data object with 'x_t' and 'f'.
         :type batch: torch_geometric.data.Data
         :return:
             Output batch with keys 'b' and 'eta' added.
         :rtype: torch.Tensor
         """
-        x= batch['x']
+        x = batch['x_t']
         f = batch['f']
+        B = max(batch['batch'])+1
 
-        # get shapes right
-        B = batch.num_graphs
-        Dx = x.size(-1)
-        Df = f.size(-1)
-        N = x.size(0) // B
-        x = x.view(B, N, Dx).flatten(1, 2)
-        f = f.view(B, N, Df).flatten(1, 2)
+        x, mask_x = to_dense_batch(x, batch.batch)
+        f, mask_f = to_dense_batch(f, batch.batch)
+
+        x = x.flatten(start_dim=1,end_dim=-1)
+        f = f.flatten(start_dim=1,end_dim=-1)
 
         # create initial hidden state
-        state = torch.cat([x,f],dim=-1) # B,N*(Dx+Df)
+        f = torch.cat([x,f],dim=-1)
 
         # apply net
-        state = self.net(state)
+        f = self.net(f)
+
+        b = f[:,:self.out_dim].reshape(B,22,3)
+        eta = f[:,self.out_dim:].reshape(B,22,3)
 
         # get results
-        batch['b'] = state[:,:self.half_dim].reshape(B, N, Dx).reshape(B*N, Dx)
-        batch['eta'] = state[:,self.half_dim:].reshape(B, N, Dx).reshape(B*N, Dx)
+        batch['b'] = b[mask_x]
+        batch['eta'] = eta[mask_x]
 
-        batch['b_irrep'] = Irreps("1o"),
-        batch['eta_irrep'] = Irreps("1o")
+        batch['b_irrep'] = Irreps("1x1o")
+        batch['eta_irrep'] = Irreps("1x1o")
+
+        batch['feature_keys'].add('b')
+        batch['feature_keys'].add('eta')
+
         return batch

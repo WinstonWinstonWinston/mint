@@ -48,14 +48,11 @@ class EquilibriumEmbedder(nn.Module):
         self.interpolant_time_embedder = TimeEmbed(interp_time)
 
         if self.use_ff:
-            self.ff_embedder = MLPWithBN(
+            self.ff_embedder = MLP(
                 in_dim=force_field.in_dim,
                 hidden_dims=force_field.hidden_dims,
                 out_dim=force_field.out_dim,
                 activation=force_field.activation,
-                use_input_bn=force_field.use_input_bn,
-                affine=force_field.affine,
-                track_running_stats=force_field.track_running_stats,
             )
 
         self.atom_type_embed = nn.Embedding(
@@ -97,32 +94,34 @@ class EquilibriumEmbedder(nn.Module):
         atom_ty  = batch["atom_type"].long()
         t        = batch["t_interpolant"].float()
         
-        atom_emb = self.atom_type_embed(atom_ty)               # (B*N, D_atom)
+        atom_emb = self.atom_type_embed(atom_ty).squeeze(dim=1)               # (B*N, D_atom)
 
         t_emb = self.interpolant_time_embedder(t)[batch.batch] # (B*N, D_t)
 
         ff_emb = None
         parts = [atom_emb, t_emb]
 
+
         if self.use_ff:
             charge  = batch["charge"].float()
             mass    = batch["mass"].float()
             sigma   = batch["sigma"].float()
             epsilon = batch["epsilon"].float()
-            ff_in = torch.stack([charge, mass, sigma, epsilon], dim=-1)  # (B*N, 4)
-            ff_emb = self.ff_embedder(ff_in)                             # (B*N, D_ff)
+            ff_in = torch.cat([charge, mass, sigma, epsilon], dim=1)  # (B*N, 4)
+            ff_emb = self.ff_embedder(ff_in)                          # (B*N, D_ff)
             parts.append(ff_emb)
 
-        f = torch.cat(parts, dim=-1)  # (B, N, D_atom + D_t [+ D_ff])
+        f = torch.cat(parts, dim=-1)  # (B*N, D_atom + D_t [+ D_ff])
 
         batch['f'] = f
         batch['f_irrep'] =Irreps(str(len(f[-1]))+"x0e")
         # TODO: must add this to the "keys" list. 
+        batch['feature_keys'].add("f")
 
         return batch
 
 
-class MLPWithBN(nn.Module):
+class MLP(nn.Module):
     r"""
     A simple MLP with BatchNorm after the input (optional) and after every hidden
     linear layer.
@@ -142,28 +141,15 @@ class MLPWithBN(nn.Module):
     :param activation:
         Nonlinearity name parsed by :func:`mint.utils.parse_activation`.
     :type activation: str
-    :param use_input_bn:
-        If ``True``, apply BatchNorm to the inputs.
-    :type use_input_bn: bool
-    :param affine:
-        Whether BN layers learn affine scale/shift and linears drop bias when ``True``.
-    :type affine: bool
-    :param track_running_stats:
-        Whether BN tracks running mean/var.
-    :type track_running_stats: bool
     """
-    def __init__(self, in_dim, hidden_dims=(128, 128), out_dim=1, activation='relu',
-                 use_input_bn=False, affine=True, track_running_stats=True):
+    def __init__(self, in_dim, hidden_dims=(128, 128), out_dim=1, activation='relu'):
         super().__init__()
         layers = []
-        if use_input_bn:
-            layers += [nn.BatchNorm1d(in_dim, affine=affine, track_running_stats=track_running_stats)]
 
         last = in_dim
         for h in hidden_dims:
             layers += [
-                nn.Linear(last, h, bias=not affine),           # bias not needed if BN affine=True
-                nn.BatchNorm1d(h, affine=affine, track_running_stats=track_running_stats),
+                nn.Linear(last, h),           # bias not needed if BN affine=True
                 parse_activation(activation)
             ]
             last = h

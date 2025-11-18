@@ -36,6 +36,11 @@ class ADPDataset(MINTDataset):
         super().__init__(data_dir, data_proc_fname, data_proc_ext,data_raw_fname,data_raw_ext,
                         split, total_frames_train, total_frames_test, total_frames_valid,
                         lag, normalize, node_features, augement_rotations)
+        
+        if lag.equilibrium:
+            self.meta_keys = self.meta_keys + ["feature_keys","x_irrep","charge_irrep","atom_type_irrep","mass_irrep","sigma_irrep","epsilon_irrep","name"]
+        else:
+            self.meta_keys = self.meta_keys + ["feature_keys","x_0_irrep","t_irrep","x_irrep","charge_irrep","atom_type_irrep","mass_irrep","sigma_irrep","epsilon_irrep","name"]
     
     def _preprocess_node_features(self,parm) -> dict[str, Tensor]:
         """
@@ -55,19 +60,19 @@ class ADPDataset(MINTDataset):
         node_f = dict()
 
         node_f["name"] =  name
-        node_f["atom_type"] =  atom_type
+        node_f["atom_type"] =  atom_type.unsqueeze(dim=-1)
 
         if self.node_features.sigma:
-            node_f["sigma"] = sigmas
+            node_f["sigma"] = sigmas.unsqueeze(dim=-1)
         
         if self.node_features.epsilon:
-            node_f["epsilon"] = epsilons
+            node_f["epsilon"] = epsilons.unsqueeze(dim=-1)
         
         if self.node_features.charge:
-            node_f["charge"] = charges
+            node_f["charge"] = charges.unsqueeze(dim=-1)
 
         if self.node_features.mass:
-            node_f["mass"] = mass
+            node_f["mass"] = mass.unsqueeze(dim=-1)
 
         return node_f
     
@@ -91,7 +96,7 @@ class ADPDataset(MINTDataset):
 
         if self.lag.equilibrium:
             frames,mean,std = self._preprocess_traj_equilibrium(traj) # tensor traj is [T,N,3]
-
+            
             results = []
             for frame in frames:
                 processed_frame = self._preprocess_one_equilibrium(frame, node_feats)
@@ -144,9 +149,9 @@ class ADPDataset(MINTDataset):
                 sigma=data['sigma'],
                 epsilon=data['epsilon'],
 
-                keys = ["x","charge","atom_type","mass","sigma","epsilon"],
+                feature_keys = {"x","charge","atom_type","mass","sigma","epsilon"},
 
-                name=data['name'],
+                names=data['name'],
 
                 x_irrep=Irreps("1o"),
                 charge_irrep=Irreps("0e"),
@@ -166,7 +171,7 @@ class ADPDataset(MINTDataset):
                 sigma=data['sigma'],
                 epsilon=data['epsilon'],
 
-                keys = ["t","x_0","x","charge","atom_type","mass","sigma","epsilon"],
+                feature_keys = {"t","x_0","x","charge","atom_type","mass","sigma","epsilon"},
 
                 name=data['name'],
                 

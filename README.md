@@ -4,9 +4,8 @@ Molecular Interpolant using Neural Transporters (MINT)
 
 TODO:
 
-- Create an equivariance testing setup
 - Create a forward/backward pass benchmarking code
 - Include ability for multiple experiments during training
-- Simplify yaml setup
 - Create free energy calculation setup for given reaction coordinate
+- Non Wandb Logging, wandb is hiding bugs i think??
 - Enable mirror interpolants.
