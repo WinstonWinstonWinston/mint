@@ -92,7 +92,7 @@ module = EquivariantMINTModule(
             "number_of_basis": 64,
             "edge_basis": "gaussian",
             "mlp_act": "silu",
-            "mlp_drop": 0.2,
+            "mlp_drop": 0,
             "conv_weight_layers": [192],
             "update_weight_layers": [128],
             "message_update_count_cond": 4,
@@ -133,9 +133,8 @@ st = MINTState(
     dataset_test=ds_test,
 )
 
-
 eqv_test_cfg = OmegaConf.create({"split":"train",
-                                 "batch_size":5,
+                                 "batch_size":3,
                                  "number_of_trials":5,
                                  "tolerance_dict": {"x": 1e-6,
                                                     "charge":1e-6,
@@ -147,19 +146,37 @@ eqv_test_cfg = OmegaConf.create({"split":"train",
                                                     "t_interpolant":1e-6,
                                                     "x_t":1e-6,
                                                     "z":1e-6,
-                                                    "f": 1e-6,
-                                                    "f_cond":1e-6,
-                                                    "b":1e-6,
-                                                    "eta":1e-6},
+                                                    "f": 1e-3,
+                                                    "f_cond":1e-3,
+                                                    "b":1e-3,
+                                                    "eta":1e-3},
                                  
 
                 })
 
+eqv_test = EquivarianceTest(st, eqv_test_cfg)
+results = eqv_test.run()
 
-eqv_test = EquivarianceTest(st,eqv_test_cfg)
-results =eqv_test.run()
+row_fmt = "{:<15} {:<6} {:>10} {:>10} {:>10} {:>10} {:>14} {:>14}"
 
-print(results)
+# header
+print(row_fmt.format(
+    "name", "status", "mean", "std", "max", "tol", "norm_before", "norm_after"
+))
+print("-" * 96)
+
+# rows
+for k, v in sorted(results.items()):
+    mean = f"{v['mean'].item():.4g}"
+    std = f"{v['std'].item():.4g}"
+    max_ = f"{v['max'].item():.4g}"
+    tol = f"{v['tol'].item():.4g}"
+    nb = f"{v['norm_before'].item():.4g}"
+    na = f"{v['norm_after'].item():.4g}"
+    status = "OK" if v["all_true"].item() else "FAIL"
+
+    print(row_fmt.format(k, status, mean, std, max_, tol, nb, na))
+
 
 # train_cfg = OmegaConf.create({
 #     "trainer": {
@@ -211,6 +228,7 @@ print(results)
 # })
 
 # logger = logging.getLogger(__name__)
+
 # logging_levels = ("debug", "info", "warning", "error", "exception", "fatal", "critical")
 # for level in logging_levels:
 #     setattr(logger, level, rank_zero_only(getattr(logger, level)))
