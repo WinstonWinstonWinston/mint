@@ -59,7 +59,7 @@ ds_valid = ADPDataset(data_dir='/users/1/sull1276/mint/tests/../mint/data/ADP',
                        node_features= OmegaConf.create({"epsilon": True, "sigma": True, "charge": True, "mass": True}), 
                        augement_rotations=False)
 
-max_epochs = 20
+max_epochs = 500
 
 module = EquivariantMINTModule(
     cfg=OmegaConf.create({
@@ -67,7 +67,6 @@ module = EquivariantMINTModule(
             "_target_": "mint.prior.normal.NormalPrior",
             "mean": 0.0,
             "std": 0.5,
-            "antithetic":True,
         },
         "embedder": {
             "_target_": "mint.model.embedding.equilibrium_embedder.EquilibriumEmbedder",
@@ -105,7 +104,7 @@ module = EquivariantMINTModule(
             "mlp_drop": 0,
             "conv_weight_layers": [192],
             "update_weight_layers": [128],
-            "message_update_count_cond": 4,
+            "message_update_count_cond": 2,
             "message_update_count_eta": 2,
             "message_update_count_b": 2,
         },
@@ -135,6 +134,9 @@ module = EquivariantMINTModule(
 
 print(module)
     
+ckpt = torch.load("logs/hydra/ckpt/epoch_148-step_29800-loss_-11911615.0000.ckpt", map_location="cuda")
+module.load_state_dict(ckpt["state_dict"])
+
 st = MINTState(
     seed=42,
     module=module,
@@ -187,9 +189,6 @@ for k, v in sorted(results.items()):
 
     print(row_fmt.format(k, status, mean, std, max_, tol, nb, na))
 
-ckpt = torch.load("logs/hydra/ckpt/epoch_4-step_1000-loss_-11891369.0000.ckpt", map_location="cuda")
-module.load_state_dict(ckpt["state_dict"])
-
 st = MINTState(
     seed=42,
     module=module.to('cuda'),
@@ -197,6 +196,85 @@ st = MINTState(
     dataset_valid=ds_valid,
     dataset_test=ds_test,
 )
+
+# print(module)
+
+# subset = Subset(ds_test, range(64))
+
+# loader = DataLoader(
+#     subset,
+#     shuffle=False,
+#     batch_size=64,
+#     collate_fn = make_meta_collate(ds_train.meta_keys)
+# )
+
+# def epsilon_fn(t):
+#     return torch.ones_like(t)*0.1
+    
+# generate_cfg = OmegaConf.create(
+#     {   "dt": 1e-3,
+#         "step_type": "ode", # or "sde"
+#         "clip_val": 1e-3,
+#         "save_traj": False
+#     }
+# )
+
+# gen_experiment = Generate(state=st, cfg=generate_cfg, batches = loader, epsilon=epsilon_fn)
+
+# with torch.no_grad():
+#     samples = gen_experiment.run()
+
+
+# X = [sample['x'] for sample in samples]
+# X = torch.stack(X)
+# B, N, C = X.shape              # B = 5, N = 1408, C = 3
+# nodes = 22
+
+# T = (B * N) // nodes           # total number of graphs T
+# X = X.view(-1, nodes, C)  # shape [T, 22, 3]
+
+# def save_xyz(
+#     trajectory: torch.Tensor,
+#     atomic_numbers: list[int] | torch.Tensor,
+#     prefix: str = "output",
+# ):
+#     """
+#     Save a trajectory of shape (steps, B, N, 3) as one XYZ file per batch,
+#     using atomic numbers for proper element symbols.
+
+#     Parameters
+#     ----------
+#     trajectory : torch.Tensor
+#         Tensor of shape (steps, B, N, 3)
+#     atomic_numbers : list[int] or torch.Tensor
+#         Atomic numbers of shape (N,)
+#     prefix : str
+#         Output file prefix; files will be named '{prefix}_{b}.xyz'
+#     """
+#     B, N, _ = trajectory.shape
+
+#     if isinstance(atomic_numbers, torch.Tensor):
+#         atomic_numbers = atomic_numbers.tolist()
+
+#     # Periodic table mapping for atomic numbers 1–20, fallback to "X"
+#     periodic_table = { 0: "H",
+#         1: "H",  2: "He", 3: "Li", 4: "Be", 5: "B",  6: "C",  7: "N",  8: "O",  9: "F", 10: "Ne",
+#         11: "Na",12: "Mg",13: "Al",14: "Si",15: "P",16: "S",17: "Cl",18: "Ar",19: "K", 20: "Ca",
+#     }
+
+#     symbols = [periodic_table.get(z, "X") for z in atomic_numbers]
+#     with open(f"{prefix}.xyz", "w") as f:
+#         for b in range(B):
+#             f.write(f"{N}\n")
+#             f.write(f"Frame {b}\n")
+#             for atom in range(N):
+#                 x, y, z = trajectory[b, atom]
+#                 symbol = symbols[atom]
+#                 f.write(f"{symbol} {x:.3f} {y:.3f} {z:.3f}\n")
+
+# atomic_numbers = [a.atomic_number for a in pmd.load_file("../mint/data/ADP/alanine-dipeptide-nowater.pdb").atoms]
+
+# save_xyz(X,atomic_numbers)
 
 print(module)
 
@@ -208,15 +286,14 @@ loader = DataLoader(
     batch_size=64,
     collate_fn = make_meta_collate(ds_train.meta_keys)
 )
-
 def epsilon_fn(t):
     return torch.ones_like(t)*0.1
     
 generate_cfg = OmegaConf.create(
     {   "dt": 1e-3,
-        "step_type": "sde", # or "sde"
-        "clip_val": 1e-3,
-        "save_traj": False
+        "step_type": "ode", # or "sde"
+        "clip_val": 1e-10,
+        "save_traj": True
     }
 )
 
@@ -225,14 +302,9 @@ gen_experiment = Generate(state=st, cfg=generate_cfg, batches = loader, epsilon=
 with torch.no_grad():
     samples = gen_experiment.run()
 
+X = [sample['x_traj'] for sample in samples][0]
 
-X = [sample['x'] for sample in samples]
-X = torch.stack(X)
-B, N, C = X.shape              # B = 5, N = 1408, C = 3
-nodes = 22
-
-T = (B * N) // nodes           # total number of graphs T
-X = X.view(-1, nodes, C)  # shape [T, 22, 3]
+print(X.size())
 
 def save_xyz(
     trajectory: torch.Tensor,
@@ -275,4 +347,18 @@ def save_xyz(
 
 atomic_numbers = [a.atomic_number for a in pmd.load_file("../mint/data/ADP/alanine-dipeptide-nowater.pdb").atoms]
 
-save_xyz(X,atomic_numbers)
+def save_trajectories_per_graph(X, atomic_numbers, base_prefix="traj",max_num=3):
+    T, N_total, _ = X.shape
+    n_nodes = 22
+    assert N_total % n_nodes == 0
+    n_graphs = N_total // n_nodes             # 64
+
+    for g in range(min(n_graphs,max_num)):
+        start = g * n_nodes
+        end = (g + 1) * n_nodes
+        X_graph = X[:, start:end, :]          # (T, 22, 3)
+
+        prefix = f"{base_prefix}_graph{g:03d}"
+        save_xyz(X_graph, atomic_numbers, prefix=prefix)
+
+save_trajectories_per_graph(X, atomic_numbers, base_prefix="traj")

@@ -51,6 +51,7 @@ class MINTDataset(Dataset):
         
         self.processed_data = self._preprocess(raw_path, processed_path)
         self.meta_keys = []
+
 # --------------------------------- preprocessing methods ---------------------------------
 #       The methods in this section are built to preprocess a trajectory dataset.
 #       Preprocessing should only occur once after cloning the repo.
@@ -121,96 +122,96 @@ class MINTDataset(Dataset):
 
         return frames,mean,std
     
-    def _preprocess_traj_nonequilibrium(self, traj) -> tuple[Tensor, Tensor, Tensor, Tensor, Tensor]:
-        """
-        Expects traj to be a time-major axis tensor [T,N,3]. Preprocesses the trajectory into a time lagged dataset.
+    # def _preprocess_traj_nonequilibrium(self, traj) -> tuple[Tensor, Tensor, Tensor, Tensor, Tensor]:
+    #     """
+    #     Expects traj to be a time-major axis tensor [T,N,3]. Preprocesses the trajectory into a time lagged dataset.
         
-        lag.type in {stochastic, fixed} 
-        lag.dist in {uniform, fixdisexped}
+    #     lag.type in {stochastic, fixed} 
+    #     lag.dist in {uniform, fixdisexped}
 
-        note: trajectory must be longer than lag.max
+    #     note: trajectory must be longer than lag.max
 
-        D corresponds to the frames specified by total_frames_*
+    #     D corresponds to the frames specified by total_frames_*
 
-        Returns: a tuple of trajectory related objects
-            - frames_start : [D, N, 3] (normalized based off config flags)
-            - frames_end : [D, N, 3] (normalized based off config flags)
-            - mean : [self._dataset_cfg.lag.max, N, 3] or [1] based on time dependent flag 
-            - std : [self._dataset_cfg.lag.max, N, 3] or [1] based on time dependent flag 
-            - delta_idx : [D]
+    #     Returns: a tuple of trajectory related objects
+    #         - frames_start : [D, N, 3] (normalized based off config flags)
+    #         - frames_end : [D, N, 3] (normalized based off config flags)
+    #         - mean : [self._dataset_cfg.lag.max, N, 3] or [1] based on time dependent flag 
+    #         - std : [self._dataset_cfg.lag.max, N, 3] or [1] based on time dependent flag 
+    #         - delta_idx : [D]
 
-        """
-        assert len(traj) > self.lag.max
+    #     """
+    #     assert len(traj) > self.lag.max
 
-        # grab unique frames from dataset
-        n_frames = getattr(self, f"total_frames_{self.split}")
+    #     # grab unique frames from dataset
+    #     n_frames = getattr(self, f"total_frames_{self.split}")
 
-        start_frame_idx = torch.randperm(len(traj) - self.lag.max)[:n_frames]
+    #     start_frame_idx = torch.randperm(len(traj) - self.lag.max)[:n_frames]
 
-        if self.lag.type == "stochastic":
+    #     if self.lag.type == "stochastic":
             
-            if self.lag.dist == "uniform":
-                delta_idx = torch.randint(low=self.lag.min,high=self.lag.max,size=(n_frames,))
-            if self.lag.dist == "disexp":
-                delta_idx = torch.exp(torch.rand((n_frames,), dtype=torch.float32) * torch.log(torch.as_tensor(self.lag.max, dtype=torch.float32))).floor().to(torch.int64)
+    #         if self.lag.dist == "uniform":
+    #             delta_idx = torch.randint(low=self.lag.min,high=self.lag.max,size=(n_frames,))
+    #         if self.lag.dist == "disexp":
+    #             delta_idx = torch.exp(torch.rand((n_frames,), dtype=torch.float32) * torch.log(torch.as_tensor(self.lag.max, dtype=torch.float32))).floor().to(torch.int64)
             
-            else:
-                raise NotImplementedError("Distribution type requested not implemented.")
+    #         else:
+    #             raise NotImplementedError("Distribution type requested not implemented.")
             
-        elif self.lag.type == "fixed":
-            delta_idx =  self.lag.max*torch.ones_like(start_frame_idx)
+    #     elif self.lag.type == "fixed":
+    #         delta_idx =  self.lag.max*torch.ones_like(start_frame_idx)
         
-        else:
-            raise NotImplementedError("Lag type requested not implemented.")
+    #     else:
+    #         raise NotImplementedError("Lag type requested not implemented.")
         
-        end_frame_idx = start_frame_idx + delta_idx
+    #     end_frame_idx = start_frame_idx + delta_idx
         
-        frames_start = torch.tensor(traj.centered().xyz[start_frame_idx])
-        frames_end = torch.tensor(traj.centered().xyz[end_frame_idx])
-        frames = torch.cat([frames_start, frames_end], dim=0)
+    #     frames_start = torch.tensor(traj.centered().xyz[start_frame_idx])
+    #     frames_end = torch.tensor(traj.centered().xyz[end_frame_idx])
+    #     frames = torch.cat([frames_start, frames_end], dim=0)
 
-        std = frames.std()
-        mean = torch.mean(frames)
-        normalized_frames_start = (frames_start - mean)/std
-        normalized_frames_end = (frames_end - mean)/std
+    #     std = frames.std()
+    #     mean = torch.mean(frames)
+    #     normalized_frames_start = (frames_start - mean)/std
+    #     normalized_frames_end = (frames_end - mean)/std
 
-        if self.normalize.bool:
-            if self.normalize.t_dependent:
-                MU, STD = self.lag_whitening_stats(traj, self.lag.max)
+    #     if self.normalize.bool:
+    #         if self.normalize.t_dependent:
+    #             MU, STD = self.lag_whitening_stats(traj, self.lag.max)
 
-                normalized_frames_end = (frames_end - MU[delta_idx])/ STD[delta_idx]
-                return normalized_frames_start, normalized_frames_end, MU, STD, delta_idx
+    #             normalized_frames_end = (frames_end - MU[delta_idx])/ STD[delta_idx]
+    #             return normalized_frames_start, normalized_frames_end, MU, STD, delta_idx
 
-            else:
-                return normalized_frames_start, normalized_frames_end, mean, std, delta_idx
+    #         else:
+    #             return normalized_frames_start, normalized_frames_end, mean, std, delta_idx
             
-        return frames_start, frames_end, mean, std, delta_idx
+    #     return frames_start, frames_end, mean, std, delta_idx
 
-    def lag_whitening_stats(self,x: torch.Tensor, t_max: int, unbiased: bool = True, eps: float = 1e-8):
-        """
-        x      : [T, *S] time-major tensor
-        t_max  : largest lag to compute (clipped to T-1)
-        unbiased: use sample std if True (Torch's default behavior)
-        eps    : small additive to std for numerical safety (e.g., 1e-8)
+    # def lag_whitening_stats(self,x: torch.Tensor, t_max: int, unbiased: bool = True, eps: float = 1e-8):
+    #     """
+    #     x      : [T, *S] time-major tensor
+    #     t_max  : largest lag to compute (clipped to T-1)
+    #     unbiased: use sample std if True (Torch's default behavior)
+    #     eps    : small additive to std for numerical safety (e.g., 1e-8)
 
-        Returns:
-        MU  : [t_max, *S]  where MU[t-1]  = mean over i of (x_{i+t} - x_i) at lag t
-        STD : [t_max, *S]  where STD[t-1] = std  over i of (x_{i+t} - x_i) at lag t
-        """
-        T, *S = x.shape
-        if T < 2:
-            raise ValueError("x needs at least two time steps")
-        t_max = max(1, min(int(t_max), T - 1))
+    #     Returns:
+    #     MU  : [t_max, *S]  where MU[t-1]  = mean over i of (x_{i+t} - x_i) at lag t
+    #     STD : [t_max, *S]  where STD[t-1] = std  over i of (x_{i+t} - x_i) at lag t
+    #     """
+    #     T, *S = x.shape
+    #     if T < 2:
+    #         raise ValueError("x needs at least two time steps")
+    #     t_max = max(1, min(int(t_max), T - 1))
 
-        MU  = torch.empty((t_max, *S), dtype=x.dtype, device=x.device)
-        STD = torch.empty((t_max, *S), dtype=x.dtype, device=x.device)
+    #     MU  = torch.empty((t_max, *S), dtype=x.dtype, device=x.device)
+    #     STD = torch.empty((t_max, *S), dtype=x.dtype, device=x.device)
 
-        for t in range(1, t_max + 1):
-            delta = x[t:] - x[:-t]           # [T - t, *S]
-            MU[t-1]  = delta.mean(dim=0)
-            STD[t-1] = delta.std(dim=0, unbiased=unbiased) + eps
+    #     for t in range(1, t_max + 1):
+    #         delta = x[t:] - x[:-t]           # [T - t, *S]
+    #         MU[t-1]  = delta.mean(dim=0)
+    #         STD[t-1] = delta.std(dim=0, unbiased=unbiased) + eps
 
-        return MU, STD
+    #     return MU, STD
     
     @abstractmethod
     def _preprocess_node_features(self, **kwargs) -> dict:

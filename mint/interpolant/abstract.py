@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 import torch
 from typing import Dict
 from tqdm.auto import tqdm
+from torch_scatter import scatter_mean
 
 class Corrector(ABC):
     r"""
@@ -187,9 +188,9 @@ class Interpolant(ABC):
             A dictionary of loss values with keys loss, loss_velocity, and loss_denoiser
         :rtype: dict[str, torch.Tensor]
         """
-        interpolant_dot = self.interpolate_derivative(t,x_0,x_1,z)
-        loss_velocity  = torch.mean(torch.einsum('BD,BD->B', b, b    ) - 2*torch.einsum('BD, BD', b, interpolant_dot))
-        loss_denoiser  = torch.mean(torch.einsum('BD,BD->B', eta, eta) - 2*torch.einsum('BD, BD', eta, z))
+        interpolant_dot = self.interpolate_derivative(t,x_0,x_1,z) # \partial_t I(x_0,x_1,t) + \dot{\gamma(t)}z
+        loss_velocity  = torch.mean(torch.einsum('BD,BD->B', b, b    ) - 2*torch.einsum('BD,BD->B', b, interpolant_dot))
+        loss_denoiser  = torch.mean(torch.einsum('BD,BD->B', eta, eta) - 2*torch.einsum('BD,BD->B', eta, z))
         loss = (self.velocity_weight*loss_velocity + self.denoiser_weight*loss_denoiser)/(self.velocity_weight + self.denoiser_weight)
         return {"loss": loss,
                 "loss_velocity": loss_velocity,
@@ -229,7 +230,7 @@ class Interpolant(ABC):
         """
         return (
             x_t                                                     # Previous state
-            + (b - epsilon(t)[:,None] * eta / self.gamma(t)[:,None]) * dt           # drift
+            + (b - epsilon(t)[:,None] * eta / self.gamma(t)[:,None]) * dt # drift
             + (2 * epsilon(t)[:,None]* dt) ** 0.5 * torch.randn_like(x_t)  # volatility
         )
 
@@ -313,7 +314,7 @@ class Interpolant(ABC):
         B = int(torch.max(batch['batch']) +1)
 
         # Build time grid on the same device/dtype as x for consistency.
-        x_t = batch["x"]
+        x_t = batch["x_t"]
         t_grid = torch.arange(
             clip_val,
             1 - clip_val,
@@ -346,20 +347,20 @@ class Interpolant(ABC):
             # Eta is optional; if missing, default to zeros.
             eta =batch["eta"]
 
-            if torch.any(torch.isnan(b)):
-                print(t_val)
-                return {"x":x_t}
-
             # Step according to the selected scheme.
             if is_ode:
                 x_t = self.step_ode(x_t, b, dt)
             else:
                 x_t = self.step_sde(x_t, b, eta, t[batch.batch], dt, epsilon)
 
+            # center data
+            m = scatter_mean(x_t, batch['batch'], dim=0)
+            x_t = x_t - m[batch['batch']]
+
             # Update batch and record the new state.
-            batch["x"] = x_t
+            batch["x_t"] = x_t
             if save_traj:
-                x_traj.append(x_t.clone())
+                x_traj.append(batch["x_t"].clone())
 
         # Stack into a single tensor: (num_steps+1, batch, ...)
         if save_traj:
@@ -367,12 +368,11 @@ class Interpolant(ABC):
 
             return {
                 "x_traj": x_traj,
-                "t_grid": t_grid,
-                "x": x_traj[-1], # final state
+                "x": x_traj[-1],
             }
         
         return {
-                "x": x_t, # final state
+                "x": x_t,
             }
 
 class LinearInterpolant(Interpolant):

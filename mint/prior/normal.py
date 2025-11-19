@@ -12,7 +12,9 @@ class NormalPrior(MINTPrior):
     :param cfg:
         Configuration object (dataclass/dict/omegaconf) holding prior hyperparameters.
     :type cfg: Any
-    """
+
+    ANTITHETIC BROKEN NUMNUTZ IDIOT DUMBASS THAT IS NOOOOT WHAT IT IS WHAT WERE U THINKING
+    """ 
 
     def __init__(self, mean:float, std: float, antithetic = False) -> None:
         super().__init__()
@@ -23,40 +25,11 @@ class NormalPrior(MINTPrior):
     def sample(self, batch: Data, stratified: bool = False) -> Data:
         """
         Draw samples from the prior and return the same batch object type with updated keys.
-
-        :param batch:
-            A torch batch of geometric data objects coming from a data loader.
-        :type batch: torch_geometric.data.Data
-        :param stratified:
-            Whether to use stratified sampling over the time variable
-        :type stratified: bool
-
-        :return:
-            The input batch type with modified keys.
-        :rtype: torch_geometric.data.Data
         """
         x_base = torch.randn_like(batch['x'])*self.std + self.mean
         B = max(batch['batch']) + 1 # shift by 1, zero indexing
         device = batch['x'].device
-        if self.antithetic:
-            if not stratified:
-                # number of independent t's we need (each generates a pair t, 1 - t)
-                n_pairs = (B + 1) // 2
-                t_base = torch.rand(n_pairs, device=device)
-            else:
-                n_pairs = (B + 1) // 2
-                # stratified sampling in [0, 1] for n_pairs values
-                t_base = torch.cat([
-                    (i + torch.rand(n_pairs // 4 + (i < n_pairs % 4), device=device)) / 4
-                    for i in range(4)
-                ])[:n_pairs]
-
-            # make pairs (t, 1 - t)
-            t_interpolant = torch.cat([t_base, 1.0 - t_base], dim=0)[:B]
-
-        else:
-            t_interpolant = torch.rand(B, device=device) if not stratified else torch.cat([(i + torch.rand(B//4 + (i < B%4), device=device))/4 for i in range(4)])
-
+        t_interpolant = torch.rand(B, device=device)
 
         batch['x_base'] = x_base
         batch['x_base_irrep'] = Irreps("1o")

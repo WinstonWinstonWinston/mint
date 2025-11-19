@@ -1,29 +1,33 @@
+from mint.data.loader import make_meta_collate
 from mint.state import MINTState
 from mint.data.ADP.ADP_dataset import ADPDataset
-from mint.module import MINTModule
+from mint.module import EquivariantMINTModule
 from mint.experiment.train import Train
 from mint.experiment.generate import Generate
 from mint import utils
-
 import torch
 from torch import nn
 from e3nn.o3 import Irreps
 from omegaconf import OmegaConf
-import logging
 from pytorch_lightning.utilities.rank_zero import rank_zero_only
 import torch
-from torch_geometric.loader import DataLoader
+from torch.utils.data import DataLoader
 from torch.utils.data import Subset
 import parmed as pmd
+
+total_frames_train = 25600
+total_frames_test = 6400
+total_frames_valid = 6400
+
 ds_train = ADPDataset(data_dir='/users/1/sull1276/mint/tests/../mint/data/ADP', 
                        data_proc_fname="AA", 
                        data_proc_ext=".pkl.zst", 
                        data_raw_fname="alanine-dipeptide-250ns-nowater", 
                        data_raw_ext=".xtc", 
                        split="train", 
-                       total_frames_train=25600, 
-                       total_frames_test=6400, 
-                       total_frames_valid=6400, 
+                       total_frames_train=total_frames_train, 
+                       total_frames_test=total_frames_test, 
+                       total_frames_valid=total_frames_valid, 
                        lag= OmegaConf.create({"equilibrium": True}), 
                        normalize= OmegaConf.create({"bool": True, "t_dependent": False}), 
                        node_features= OmegaConf.create({"epsilon": True, "sigma": True, "charge": True, "mass": True}), 
@@ -35,9 +39,9 @@ ds_test = ADPDataset(data_dir='/users/1/sull1276/mint/tests/../mint/data/ADP',
                        data_raw_fname="alanine-dipeptide-250ns-nowater", 
                        data_raw_ext=".xtc", 
                        split="test", 
-                       total_frames_train=25600, 
-                       total_frames_test=6400, 
-                       total_frames_valid=6400, 
+                       total_frames_train=total_frames_train, 
+                       total_frames_test=total_frames_test, 
+                       total_frames_valid=total_frames_valid, 
                        lag= OmegaConf.create({"equilibrium": True}), 
                        normalize= OmegaConf.create({"bool": True, "t_dependent": False}), 
                        node_features= OmegaConf.create({"epsilon": True, "sigma": True, "charge": True, "mass": True}), 
@@ -49,20 +53,21 @@ ds_valid = ADPDataset(data_dir='/users/1/sull1276/mint/tests/../mint/data/ADP',
                        data_raw_fname="alanine-dipeptide-250ns-nowater", 
                        data_raw_ext=".xtc", 
                        split="valid", 
-                       total_frames_train=25600, 
-                       total_frames_test=6400, 
-                       total_frames_valid=6400, 
+                       total_frames_train=total_frames_train, 
+                       total_frames_test=total_frames_test, 
+                       total_frames_valid=total_frames_valid, 
                        lag= OmegaConf.create({"equilibrium": True}), 
                        normalize= OmegaConf.create({"bool": True, "t_dependent": False}), 
                        node_features= OmegaConf.create({"epsilon": True, "sigma": True, "charge": True, "mass": True}), 
                        augement_rotations=False)
 
-module = MINTModule(
+module = EquivariantMINTModule(
     cfg=OmegaConf.create({
         "prior": {
             "_target_": "mint.prior.normal.NormalPrior",
             "mean": 0.0,
-            "std": 0.25,
+            "std": 0.5,
+            "antithetic":True,
         },
         "embedder": {
             "_target_": "mint.model.embedding.equilibrium_embedder.EquilibriumEmbedder",
@@ -86,37 +91,37 @@ module = MINTModule(
             },
         },
         "model": {
-            "_target_": "mint.model.equivariant.transformer.MultiSE3Transformer",
-            "input_channels": [[320], [0]],
-            "readout_channels": [[0, 0], [0, 1]],
-            "hidden_channels": [[128, 0, 32], [0, 64, 0]],
-            "hidden_channels_attn": [[32, 0, 8], [0, 16, 0]],
-            "hidden_channels_mlp": [[384, 0, 96], [0, 192, 0]],
-            "key_channels":    [[32, 0, 8], [0, 16, 0]],
-            "query_channels":  [[32, 0, 8], [0, 1, 0]],
-            "edge_l_max": 2,
-            "edge_basis": "gaussian",
+            "_target_": "mint.model.equivariant.PaINNLike.PaiNNLikeInterpolantNet",
+            "irreps_input":        [[320  ], [0    ]],
+            "irreps":              [[32, 0], [0, 32]],
+            "irreps_readout_cond": [[32, 0], [0, 32]],
+            "irreps_readout":      [[0, 0],  [0, 1 ]],
+            "edge_l_max": 1,
             "max_radius": 1000,
-            "number_of_basis": 128,
-            "hidden_size": 64,
-            "max_neighbors": 22,
-            "act": "leakyrelu",
-            "num_layers": 6,
+            "max_neighbors": 1000,
+            "number_of_basis": 64,
+            "edge_basis": "gaussian",
+            "mlp_act": "silu",
+            "mlp_drop": 0,
+            "conv_weight_layers": [192],
+            "update_weight_layers": [128],
+            "message_update_count_cond": 2,
+            "message_update_count_eta": 2,
+            "message_update_count_b": 2,
         },
         "interpolant": {
             "_target_": "mint.interpolant.interpolants.TemporallyLinearInterpolant",
             "velocity_weight": 1.0,
-            "denoiser_weight": 0.0,
-            "gamma_weight": 0,
+            "denoiser_weight": 1.0,
+            "gamma_weight": 1/10,
         },
         "validation": {
             "stratified": False,
         },
         "optim": {
             "optimizer": {
-                "name": "AdamW",
+                "name": "Adam",
                 "lr": 5e-4,
-                "weight_decay": 5e-3,
                 "betas": [0.9, 0.999],
             },
             "scheduler": {
@@ -152,7 +157,7 @@ class InterpolantWrapper(nn.Module):
     
 model_interpolant = InterpolantWrapper(module.interpolant,module.prior)
 
-ckpt = torch.load("logs/hydra/ckpt/epoch_15-step_12800-loss_-40998.8594.ckpt", map_location="cuda")
+ckpt = torch.load("logs/hydra/ckpt/epoch_148-step_29800-loss_-11911615.0000.ckpt", map_location="cuda")
 module.load_state_dict(ckpt["state_dict"])
 
 st = MINTState(
@@ -165,16 +170,16 @@ st = MINTState(
 
 print(module)
 
-subset = Subset(ds_test, range(1))
+subset = Subset(ds_test, range(64))
 
-test_loader = DataLoader(
+loader = DataLoader(
     subset,
-    batch_size=1,
     shuffle=False,
+    batch_size=64,
+    collate_fn = make_meta_collate(ds_train.meta_keys)
 )
-
 def epsilon_fn(t):
-    return torch.ones_like(t)
+    return torch.ones_like(t)*0.1
     
 generate_cfg = OmegaConf.create(
     {   "dt": 1e-4,
@@ -184,7 +189,7 @@ generate_cfg = OmegaConf.create(
     }
 )
 
-gen_experiment = Generate(state=st, cfg=generate_cfg, batches = test_loader, epsilon=epsilon_fn)
+gen_experiment = Generate(state=st, cfg=generate_cfg, batches = loader, epsilon=epsilon_fn)
 
 with torch.no_grad():
     samples = gen_experiment.run()
@@ -192,14 +197,6 @@ with torch.no_grad():
 X = [sample['x_traj'] for sample in samples][0]
 
 print(X.size())
-print()
-import matplotlib.pyplot as plt
-plt.plot(X[:,0,0].detach().cpu())
-plt.plot(subset[0]['x'][0,0]*torch.ones(len(X[:,0,0])))
-plt.savefig('fig')
-
-
-print(torch.mean(abs(samples[0]['x'].to('cuda') - subset[0]['x'].to('cuda'))))
 
 def save_xyz(
     trajectory: torch.Tensor,

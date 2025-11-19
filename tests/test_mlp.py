@@ -3,10 +3,22 @@ from mint.data.ADP.ADP_dataset import ADPDataset
 from mint.module import EquivariantMINTModule
 from mint.experiment.train import Train
 from mint.experiment.equivariance_test import EquivarianceTest
-
+import torch
 from omegaconf import OmegaConf
 import logging
 from pytorch_lightning.utilities.rank_zero import rank_zero_only
+
+#!/bin/bash
+#SBATCH -J mint-test
+#SBATCH -o slurm-%j.out
+#SBATCH -e slurm-%j.err
+#SBATCH -p v100                  # same partition
+#SBATCH -t 08:00:00              # same time limit
+#SBATCH -N 1                     # same number of nodes
+#SBATCH --ntasks-per-node=1      # same tasks per node
+#SBATCH --cpus-per-task=1        # matches srun default
+#SBATCH --mem-per-cpu=20G        # same memory per CPU
+#SBATCH --gres=gpu:1             # same GPU request
 
 total_frames_train = 25600
 total_frames_test = 6400
@@ -101,7 +113,7 @@ module = EquivariantMINTModule(
         "optim": {
             "optimizer": {
                 "name": "Adam",
-                "lr": 5e-4,
+                "lr": 5e-3,
                 "betas": [0.9, 0.999],
             },
             "scheduler": {
@@ -112,6 +124,9 @@ module = EquivariantMINTModule(
         },
     })
 )
+
+ckpt = torch.load("logs/hydra/ckpt_MLP_1/epoch_199-step_40000-loss_-13056556.0000.ckpt", map_location="cuda")
+module.load_state_dict(ckpt["state_dict"])
 
 print(module)
     
@@ -224,7 +239,6 @@ for level in logging_levels:
     setattr(logger, level, rank_zero_only(getattr(logger, level)))
     
 trainer = Train(st, train_cfg, logger)
-
 trainer.run()
 
 results = eqv_test.run()

@@ -35,5 +35,5 @@ class Generate(Experiment):
                                                         self.generate_cfg.save_traj,
                                                         self.epsilon)
             # Save result
-            samples.append(integrated_batch)  
+            samples.append(integrated_batch)
         return samples

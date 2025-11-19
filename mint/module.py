@@ -23,8 +23,6 @@ class MINTModule(LightningModule):
         self.embedder = hydra.utils.instantiate(cfg.embedder)
         self.model = hydra.utils.instantiate(cfg.model)
         self.interpolant = hydra.utils.instantiate(cfg.interpolant)
-        # self.experiment = hydra.utils.instantiate(self.cfg.experiment)x``
-        self.save_hyperparameters()
 
     def forward(self, batch):
         """
@@ -85,7 +83,7 @@ class MINTModule(LightningModule):
         :rtype: dict[str, torch.Tensor]
         """
         batch = self.prior.sample(batch)
-        x_t, z = self.interpolant.interpolate(*utils.batch2interp(batch))
+        x_t, z = self.interpolant.interpolate(*utils.batch2interp(batch)) # x_t = I(x_0,x_1,t) + \gamma(t)*z
         batch['x_t'] = x_t
         batch['x_t_irrep'] = Irreps("1o")
         batch['feature_keys'].add("x_t")

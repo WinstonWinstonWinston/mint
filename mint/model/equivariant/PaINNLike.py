@@ -253,8 +253,8 @@ class PaINNLayer(nn.Module):
         return self.linear_conv(f_cat)
         
     def update(self, f):
-        pairs = [ (f,self.irreps),
-                  (self.tp_square(f),self.irreps)]
+        pairs = [(f,self.irreps),
+                (self.tp_square(f),self.irreps)]
         f_cat,_ = combine_features(pairs,tidy=True)
         scalar_feat_f_cat = get_rank_l(f_cat,self.irreps_cat_idx,0)
         w = self.update_weight(scalar_feat_f_cat)

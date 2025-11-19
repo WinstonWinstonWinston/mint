@@ -54,7 +54,7 @@ ds_valid = ADPDataset(data_dir='/users/1/sull1276/mint/tests/../mint/data/ADP',
                        node_features= OmegaConf.create({"epsilon": True, "sigma": True, "charge": True, "mass": True}), 
                        augement_rotations=False)
 
-max_epochs = 20
+max_epochs = 500
 
 module = EquivariantMINTModule(
     cfg=OmegaConf.create({
@@ -100,7 +100,7 @@ module = EquivariantMINTModule(
             "mlp_drop": 0,
             "conv_weight_layers": [192],
             "update_weight_layers": [128],
-            "message_update_count_cond": 4,
+            "message_update_count_cond": 2,
             "message_update_count_eta": 2,
             "message_update_count_b": 2,
         },

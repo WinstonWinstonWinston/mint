@@ -101,7 +101,6 @@ class EquilibriumEmbedder(nn.Module):
         ff_emb = None
         parts = [atom_emb, t_emb]
 
-
         if self.use_ff:
             charge  = batch["charge"].float()
             mass    = batch["mass"].float()
@@ -123,11 +122,10 @@ class EquilibriumEmbedder(nn.Module):
 
 class MLP(nn.Module):
     r"""
-    A simple MLP with BatchNorm after the input (optional) and after every hidden
-    linear layer.
+    A simple MLP.
 
     Layer pattern:
-    :math:`\text{[BN]} \rightarrow (\text{Lin} \rightarrow \text{BN} \rightarrow \phi)^{L} \rightarrow \text{Lin}_{\text{out}}`.
+    :math:`(\text{Lin} \rightarrow \phi)^{L} \rightarrow \text{Lin}_{\text{out}}`.
 
     :param in_dim:
         Input feature dimension.
