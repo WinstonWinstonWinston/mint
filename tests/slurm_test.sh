@@ -28,4 +28,4 @@ module load ompi/3.1.6/gnu-8.2.0
 module load cuda/11.8.0-gcc-7.2.0-xqzqlf2
 
 # Launch exactly one Python process bound to this GPU
-srun -n 1 python test_mlp.py
+srun -n 1 python test_painn.py

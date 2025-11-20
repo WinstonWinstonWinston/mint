@@ -134,7 +134,7 @@ module = EquivariantMINTModule(
 
 print(module)
     
-ckpt = torch.load("logs/hydra/ckpt/epoch_148-step_29800-loss_-11911615.0000.ckpt", map_location="cuda")
+ckpt = torch.load("logs/hydra/ckpt/last.ckpt", map_location="cuda")
 module.load_state_dict(ckpt["state_dict"])
 
 st = MINTState(
