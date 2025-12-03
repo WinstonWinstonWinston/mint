@@ -8,6 +8,8 @@ import torch
 from torch.utils.data import Dataset
 from omegaconf import DictConfig
 import copy
+from e3nn import o3
+from e3nn.o3 import Irreps
 
 class MINTDataset(Dataset):
     """ Abstract dataset class for mint
@@ -64,7 +66,7 @@ class MINTDataset(Dataset):
         # one global random permutation
         perm = torch.randperm(num_frames)
 
-        assert n_train + n_valid + n_test <= num_frames
+        assert n_train + n_valid + n_test <= num_frames; f"{num_frames} is not smaller than {n_train + n_valid + n_test}"
 
         idx = {}
         start = 0
@@ -78,7 +80,6 @@ class MINTDataset(Dataset):
             start = end
 
         return idx  # dict: {"train": tensor(...), "valid": ..., "test": ...}
-
 
     def _preprocess_traj_equilibrium(self, traj) -> tuple[Tensor, Tensor, Tensor]:
         """

@@ -33,7 +33,8 @@ class Generate(Experiment):
                                                         self.generate_cfg.step_type,
                                                         self.generate_cfg.clip_val,
                                                         self.generate_cfg.save_traj,
-                                                        self.epsilon)
+                                                        self.epsilon,
+                                                        self.generate_cfg.b_anneal_factor)
             # Save result
             samples.append(integrated_batch)
         return samples

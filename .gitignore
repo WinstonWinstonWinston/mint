@@ -15,6 +15,7 @@ lightning_logs/
 # Checkpoints and models
 *.pt
 *.pth
+*.ckpt
 
 # logs
 *.log

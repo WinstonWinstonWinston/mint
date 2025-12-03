@@ -228,11 +228,9 @@ class Interpolant(ABC):
         :returns: Next state :math:`X_{t+\Delta t}` (same shape/device as ``x_t``).
         :rtype: torch.Tensor
         """
-        return (
-            x_t                                                     # Previous state
-            + (b - epsilon(t)[:,None] * eta / self.gamma(t)[:,None]) * dt # drift
-            + (2 * epsilon(t)[:,None]* dt) ** 0.5 * torch.randn_like(x_t)  # volatility
-        )
+        x_t_next = x_t + (b - epsilon(t) * eta / self.gamma(t)) * dt + (2 * epsilon(t)* dt) ** 0.5 * torch.randn_like(x_t) # volatility
+        return  x_t_next
+        
 
     def step_ode(self, x_t: torch.Tensor, b:torch.Tensor, dt:float) -> torch.Tensor:
         r"""One forward Euler step for an ODE.
@@ -270,6 +268,7 @@ class Interpolant(ABC):
         clip_val: float = 1e-3,
         save_traj: bool = False,
         epsilon=lambda t: t,
+        b_anneal_factor= 1,
     ) -> Dict[str, torch.Tensor]:
         r"""Integrate the (S)DE forward and save the trajectory of :math:`x_t`.
 
@@ -342,25 +341,25 @@ class Interpolant(ABC):
             batch = model(batch)
 
             # Drift term is required.
-            b = batch["b"]
+            b = b_anneal_factor*batch["b"]
 
-            # Eta is optional; if missing, default to zeros.
+            # Eta is optional
             eta =batch["eta"]
 
             # Step according to the selected scheme.
             if is_ode:
                 x_t = self.step_ode(x_t, b, dt)
             else:
-                x_t = self.step_sde(x_t, b, eta, t[batch.batch], dt, epsilon)
+                x_t = self.step_sde(x_t, b, eta, t_val, dt, epsilon)
 
             # center data
             m = scatter_mean(x_t, batch['batch'], dim=0)
-            x_t = x_t - m[batch['batch']]
+            x_t_save = x_t - m[batch['batch']]
 
             # Update batch and record the new state.
             batch["x_t"] = x_t
             if save_traj:
-                x_traj.append(batch["x_t"].clone())
+                x_traj.append(x_t_save.clone())
 
         # Stack into a single tensor: (num_steps+1, batch, ...)
         if save_traj:
@@ -369,10 +368,12 @@ class Interpolant(ABC):
             return {
                 "x_traj": x_traj,
                 "x": x_traj[-1],
+                "batch":batch['batch'],
             }
         
         return {
                 "x": x_t,
+                "batch":batch['batch'],
             }
 
 class LinearInterpolant(Interpolant):

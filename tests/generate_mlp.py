@@ -26,8 +26,8 @@ ds_train = ADPDataset(data_dir='/users/1/sull1276/mint/tests/../mint/data/ADP',
                        total_frames_valid=total_frames_valid, 
                        lag= OmegaConf.create({"equilibrium": True}), 
                        normalize= OmegaConf.create({"bool": True, "t_dependent": False}), 
-                       node_features= OmegaConf.create({"epsilon": True, "sigma": True, "charge": True, "mass": True}), 
-                       augement_rotations=False)
+                       node_features= OmegaConf.create({"epsilon": True, "sigma": True, "charge": True, "mass": True, "idx":True}), 
+                       augement_rotations=True)
 
 ds_test = ADPDataset(data_dir='/users/1/sull1276/mint/tests/../mint/data/ADP', 
                        data_proc_fname="AA", 
@@ -40,8 +40,8 @@ ds_test = ADPDataset(data_dir='/users/1/sull1276/mint/tests/../mint/data/ADP',
                        total_frames_valid=total_frames_valid, 
                        lag= OmegaConf.create({"equilibrium": True}), 
                        normalize= OmegaConf.create({"bool": True, "t_dependent": False}), 
-                       node_features= OmegaConf.create({"epsilon": True, "sigma": True, "charge": True, "mass": True}), 
-                       augement_rotations=False)
+                       node_features= OmegaConf.create({"epsilon": True, "sigma": True, "charge": True, "mass": True, "idx":True}),
+                       augement_rotations=True)
 
 ds_valid = ADPDataset(data_dir='/users/1/sull1276/mint/tests/../mint/data/ADP', 
                        data_proc_fname="AA", 
@@ -54,10 +54,10 @@ ds_valid = ADPDataset(data_dir='/users/1/sull1276/mint/tests/../mint/data/ADP',
                        total_frames_valid=total_frames_valid, 
                        lag= OmegaConf.create({"equilibrium": True}), 
                        normalize= OmegaConf.create({"bool": True, "t_dependent": False}), 
-                       node_features= OmegaConf.create({"epsilon": True, "sigma": True, "charge": True, "mass": True}), 
-                       augement_rotations=False)
+                       node_features= OmegaConf.create({"epsilon": True, "sigma": True, "charge": True, "mass": True, "idx":True}),
+                       augement_rotations=True)
 
-max_epochs = 200
+max_epochs = 500
 
 module = EquivariantMINTModule(
     cfg=OmegaConf.create({
@@ -65,7 +65,6 @@ module = EquivariantMINTModule(
             "_target_": "mint.prior.normal.NormalPrior",
             "mean": 0.0,
             "std": 0.5,
-            "antithetic":True,
         },
         "embedder": {
             "_target_": "mint.model.embedding.equilibrium_embedder.EquilibriumEmbedder",
@@ -75,10 +74,13 @@ module = EquivariantMINTModule(
                 "max_positions": 1000,
             },
             "force_field": {
-                "in_dim": 4,
+                "in_dim": 5,
                 "hidden_dims": [128, 64],
                 "out_dim": 32,
                 "activation": "silu",
+                "use_input_bn": False,
+                "affine": False,
+                "track_running_stats": False,
             },
             "atom_type": {
                 "num_types": 14,
@@ -88,7 +90,7 @@ module = EquivariantMINTModule(
         "model": {
              "_target_": "mint.model.MLP.MINTMLP",
              "in_dim": 22*320+22*3,
-             "hidden_dims": (4096, 1024),
+             "hidden_dims": (512, 512),
              "out_dim": 22*3,
              "activation": "silu",
         },
@@ -116,10 +118,8 @@ module = EquivariantMINTModule(
     })
 )
 
-ckpt = torch.load("logs/hydra/ckpt/epoch_19-step_4000-loss_-1.3269.ckpt", map_location="cuda")
-module.load_state_dict(ckpt["state_dict"])
+print(module)
 
-    
 st = MINTState(
     seed=42,
     module=module,
@@ -173,41 +173,34 @@ for k, v in sorted(results.items()):
     print(row_fmt.format(k, status, mean, std, max_, tol, nb, na))
 
 
-print(module)
-
-subset = Subset(ds_test, range(64))
-
 loader = DataLoader(
-    subset,
+    ds_train,
     shuffle=False,
-    batch_size=64,
+    batch_size=1280,
     collate_fn = make_meta_collate(ds_train.meta_keys)
 )
 
 def epsilon_fn(t):
-    return torch.ones_like(t)*0.1
+    return t*(1-t)
     
 generate_cfg = OmegaConf.create(
-    {   "dt": 1e-3,
-        "step_type": "ode", # or "sde"
-        "clip_val": 1e-3,
-        "save_traj": False
+    {   "dt": 2.5e-2,
+        "step_type": "sde", # or "sde"
+        "clip_val": 1e-10,
+        "save_traj": False,
+        "b_anneal_factor":1
     }
 )
 
 gen_experiment = Generate(state=st, cfg=generate_cfg, batches = loader, epsilon=epsilon_fn)
 
-with torch.no_grad():
-    samples = gen_experiment.run()
+# with torch.no_grad():
+#     samples = gen_experiment.run()
 
-X = [sample['x'] for sample in samples]
+X = [to_dense_batch(sample['x'].to('cuda'),sample['batch'].to('cuda'))[0] for sample in loader]
+X = torch.cat(X, dim=0) # (T, N, 3)
 
-for b in loader:
-    batch = b['batch']
-    break
-
-sample = X[0]
-sample_dense, mask = to_dense_batch(sample,batch)
+print(X.size())
 
 def save_xyz(
     trajectory: torch.Tensor,
@@ -216,7 +209,7 @@ def save_xyz(
 ):
     """
     Save a trajectory of shape (steps, B, N, 3) as one XYZ file per batch,
-    using atomic numbers for proper element symbols.
+    using atomic numbers for proper element symbols.    
 
     Parameters
     ----------
@@ -225,7 +218,7 @@ def save_xyz(
     atomic_numbers : list[int] or torch.Tensor
         Atomic numbers of shape (N,)
     prefix : str
-        Output file prefix; files will be named '{prefix}_{b}.xyz'
+        Output file prefix; files will be named '{prefix}.xyz'
     """
     B, N, _ = trajectory.shape
 
@@ -250,4 +243,21 @@ def save_xyz(
 
 atomic_numbers = [a.atomic_number for a in pmd.load_file("../mint/data/ADP/alanine-dipeptide-nowater.pdb").atoms]
 
-save_xyz(sample_dense,atomic_numbers)
+save_xyz(X,atomic_numbers,prefix='augmented_dataset')
+
+def save_trajectories_per_graph(X, atomic_numbers, base_prefix="traj",max_num=3):
+    T, N_total, _ = X.shape
+    n_nodes = 22
+    assert N_total % n_nodes == 0
+    n_graphs = N_total // n_nodes             # 64
+
+    for g in range(min(n_graphs,max_num)):
+        start = g * n_nodes
+        end = (g + 1) * n_nodes
+        X_graph = X[:, start:end, :]          # (T, 22, 3)
+
+        prefix = f"{base_prefix}_graph{g:03d}"
+        save_xyz(X_graph, atomic_numbers, prefix=prefix)
+
+if generate_cfg.save_traj == True:
+    save_trajectories_per_graph(samples[0]['x_traj'], atomic_numbers, base_prefix="traj")

@@ -85,10 +85,10 @@ class MINTModule(LightningModule):
         batch = self.prior.sample(batch)
         x_t, z = self.interpolant.interpolate(*utils.batch2interp(batch)) # x_t = I(x_0,x_1,t) + \gamma(t)*z
         batch['x_t'] = x_t
-        batch['x_t_irrep'] = Irreps("1o")
+        batch['x_t_irrep'] = Irreps("1e")
         batch['feature_keys'].add("x_t")
         batch['z'] = z
-        batch['z_irrep'] = Irreps("1o")
+        batch['z_irrep'] = Irreps("1e")
         batch['feature_keys'].add("z")
         batch = self.forward(batch)
         loss = self.interpolant.loss(*utils.batch2loss(batch))
@@ -115,10 +115,10 @@ class MINTModule(LightningModule):
         batch = self.prior.sample(batch, stratified=self.cfg.validation.stratified)
         x_t, z = self.interpolant.interpolate(*utils.batch2interp(batch))
         batch['x_t'] = x_t
-        batch['x_t_irrep'] = Irreps("1o")
+        batch['x_t_irrep'] = Irreps("1e")
         batch['feature_keys'].add("x_t")
         batch['z'] = z
-        batch['z_irrep'] = Irreps("1o")
+        batch['z_irrep'] = Irreps("1e")
         batch['feature_keys'].add("z")
         batch = self.forward(batch)
         # TODO: Fix interpolant to have stratified flag
@@ -166,10 +166,10 @@ class EquivariantMINTModule(MINTModule):
         batch = self.prior.sample(batch)
         x_t, z = self.interpolant.interpolate(*utils.batch2interp(batch))
         batch['x_t'] = x_t
-        batch['x_t_irrep'] = Irreps("1o")
+        batch['x_t_irrep'] = Irreps("1e")
         batch['feature_keys'].add("x_t")
         batch['z'] = z
-        batch['z_irrep'] = Irreps("1o")
+        batch['z_irrep'] = Irreps("1e")
         batch['feature_keys'].add("z")
 
         # sample a set of random rotations for the given batch

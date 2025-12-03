@@ -106,7 +106,8 @@ class EquilibriumEmbedder(nn.Module):
             mass    = batch["mass"].float()
             sigma   = batch["sigma"].float()
             epsilon = batch["epsilon"].float()
-            ff_in = torch.cat([charge, mass, sigma, epsilon], dim=1)  # (B*N, 4)
+            idx = batch["idx"].float()
+            ff_in = torch.cat([charge, mass, sigma, epsilon,idx], dim=1)  # (B*N, 4)
             ff_emb = self.ff_embedder(ff_in)                          # (B*N, D_ff)
             parts.append(ff_emb)
 

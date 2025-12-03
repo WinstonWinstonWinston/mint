@@ -650,8 +650,8 @@ class MultiSE3Transformer(torch.nn.Module):
         batch['b'] = self.readout_b(node_feats)
         batch['eta'] = torch.zeros_like(batch['b'])
 
-        batch['b_irrep'] = Irreps("1o"),
-        batch['eta_irrep'] = Irreps("1o")
+        batch['b_irrep'] = Irreps("1e"),
+        batch['eta_irrep'] = Irreps("1e")
 
         return batch
     

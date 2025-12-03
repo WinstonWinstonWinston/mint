@@ -23,7 +23,7 @@ ds_train = ADPDataset(data_dir='/users/1/sull1276/mint/tests/../mint/data/ADP',
                        total_frames_valid=total_frames_valid, 
                        lag= OmegaConf.create({"equilibrium": True}), 
                        normalize= OmegaConf.create({"bool": True, "t_dependent": False}), 
-                       node_features= OmegaConf.create({"epsilon": True, "sigma": True, "charge": True, "mass": True}), 
+                       node_features= OmegaConf.create({"epsilon": True, "sigma": True, "charge": True, "mass": True, "idx":True}), 
                        augement_rotations=False)
 
 ds_test = ADPDataset(data_dir='/users/1/sull1276/mint/tests/../mint/data/ADP', 
@@ -37,7 +37,7 @@ ds_test = ADPDataset(data_dir='/users/1/sull1276/mint/tests/../mint/data/ADP',
                        total_frames_valid=total_frames_valid, 
                        lag= OmegaConf.create({"equilibrium": True}), 
                        normalize= OmegaConf.create({"bool": True, "t_dependent": False}), 
-                       node_features= OmegaConf.create({"epsilon": True, "sigma": True, "charge": True, "mass": True}), 
+                       node_features= OmegaConf.create({"epsilon": True, "sigma": True, "charge": True, "mass": True, "idx":True}),
                        augement_rotations=False)
 
 ds_valid = ADPDataset(data_dir='/users/1/sull1276/mint/tests/../mint/data/ADP', 
@@ -51,7 +51,7 @@ ds_valid = ADPDataset(data_dir='/users/1/sull1276/mint/tests/../mint/data/ADP',
                        total_frames_valid=total_frames_valid, 
                        lag= OmegaConf.create({"equilibrium": True}), 
                        normalize= OmegaConf.create({"bool": True, "t_dependent": False}), 
-                       node_features= OmegaConf.create({"epsilon": True, "sigma": True, "charge": True, "mass": True}), 
+                       node_features= OmegaConf.create({"epsilon": True, "sigma": True, "charge": True, "mass": True, "idx":True}),
                        augement_rotations=False)
 
 max_epochs = 500
@@ -62,7 +62,6 @@ module = EquivariantMINTModule(
             "_target_": "mint.prior.normal.NormalPrior",
             "mean": 0.0,
             "std": 0.5,
-            "antithetic":True,
         },
         "embedder": {
             "_target_": "mint.model.embedding.equilibrium_embedder.EquilibriumEmbedder",
@@ -72,7 +71,7 @@ module = EquivariantMINTModule(
                 "max_positions": 1000,
             },
             "force_field": {
-                "in_dim": 4,
+                "in_dim": 5,
                 "hidden_dims": [128, 64],
                 "out_dim": 32,
                 "activation": "silu",
@@ -86,11 +85,11 @@ module = EquivariantMINTModule(
             },
         },
         "model": {
-            "_target_": "mint.model.equivariant.PaINNLike.PaiNNLikeInterpolantNet",
-            "irreps_input":        [[320  ], [0    ]],
-            "irreps":              [[32, 0], [0, 32]],
-            "irreps_readout_cond": [[32, 0], [0, 32]],
-            "irreps_readout":      [[0, 0],  [0, 1 ]],
+            "_target_": "mint.model.equivariant.PaiNN.PaiNNLikeInterpolantNet",
+            "irreps_input":        [[320  ], []],
+            "irreps":              [[32, 32], []],
+            "irreps_readout_cond": [[32, 32], []],
+            "irreps_readout":      [[0, 1], []],
             "edge_l_max": 1,
             "max_radius": 1000,
             "max_neighbors": 1000,

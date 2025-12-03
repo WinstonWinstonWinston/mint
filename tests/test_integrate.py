@@ -67,7 +67,6 @@ module = EquivariantMINTModule(
             "_target_": "mint.prior.normal.NormalPrior",
             "mean": 0.0,
             "std": 0.5,
-            "antithetic":True,
         },
         "embedder": {
             "_target_": "mint.model.embedding.equilibrium_embedder.EquilibriumEmbedder",
@@ -91,7 +90,7 @@ module = EquivariantMINTModule(
             },
         },
         "model": {
-            "_target_": "mint.model.equivariant.PaINNLike.PaiNNLikeInterpolantNet",
+            "_target_": "mint.model.equivariant.PaiNN.PaiNNLikeInterpolantNet",
             "irreps_input":        [[320  ], [0    ]],
             "irreps":              [[32, 0], [0, 32]],
             "irreps_readout_cond": [[32, 0], [0, 32]],
@@ -150,8 +149,8 @@ class InterpolantWrapper(nn.Module):
         batch["b"] = interpolant_dot
         batch["eta"] = z
 
-        batch["b_irrep"] = Irreps("1o")
-        batch["eta_irrep"] = Irreps("1o")
+        batch["b_irrep"] = Irreps("1e")
+        batch["eta_irrep"] = Irreps("1e")
 
         return batch
     

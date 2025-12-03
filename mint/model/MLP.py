@@ -78,8 +78,8 @@ class MINTMLP(nn.Module):
         batch['b'] = b[mask_x]
         batch['eta'] = eta[mask_x]
 
-        batch['b_irrep'] = Irreps("1x1o")
-        batch['eta_irrep'] = Irreps("1x1o")
+        batch['b_irrep'] = Irreps("1x1e")
+        batch['eta_irrep'] = Irreps("1x1e")
 
         batch['feature_keys'].add('b')
         batch['feature_keys'].add('eta')

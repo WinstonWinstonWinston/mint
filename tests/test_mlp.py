@@ -8,18 +8,6 @@ from omegaconf import OmegaConf
 import logging
 from pytorch_lightning.utilities.rank_zero import rank_zero_only
 
-#!/bin/bash
-#SBATCH -J mint-test
-#SBATCH -o slurm-%j.out
-#SBATCH -e slurm-%j.err
-#SBATCH -p v100                  # same partition
-#SBATCH -t 08:00:00              # same time limit
-#SBATCH -N 1                     # same number of nodes
-#SBATCH --ntasks-per-node=1      # same tasks per node
-#SBATCH --cpus-per-task=1        # matches srun default
-#SBATCH --mem-per-cpu=20G        # same memory per CPU
-#SBATCH --gres=gpu:1             # same GPU request
-
 total_frames_train = 25600
 total_frames_test = 6400
 total_frames_valid = 6400
@@ -35,8 +23,8 @@ ds_train = ADPDataset(data_dir='/users/1/sull1276/mint/tests/../mint/data/ADP',
                        total_frames_valid=total_frames_valid, 
                        lag= OmegaConf.create({"equilibrium": True}), 
                        normalize= OmegaConf.create({"bool": True, "t_dependent": False}), 
-                       node_features= OmegaConf.create({"epsilon": True, "sigma": True, "charge": True, "mass": True}), 
-                       augement_rotations=False)
+                       node_features= OmegaConf.create({"epsilon": True, "sigma": True, "charge": True, "mass": True, "idx":True}), 
+                       augement_rotations=True)
 
 ds_test = ADPDataset(data_dir='/users/1/sull1276/mint/tests/../mint/data/ADP', 
                        data_proc_fname="AA", 
@@ -49,8 +37,8 @@ ds_test = ADPDataset(data_dir='/users/1/sull1276/mint/tests/../mint/data/ADP',
                        total_frames_valid=total_frames_valid, 
                        lag= OmegaConf.create({"equilibrium": True}), 
                        normalize= OmegaConf.create({"bool": True, "t_dependent": False}), 
-                       node_features= OmegaConf.create({"epsilon": True, "sigma": True, "charge": True, "mass": True}), 
-                       augement_rotations=False)
+                       node_features= OmegaConf.create({"epsilon": True, "sigma": True, "charge": True, "mass": True, "idx":True}),
+                       augement_rotations=True)
 
 ds_valid = ADPDataset(data_dir='/users/1/sull1276/mint/tests/../mint/data/ADP', 
                        data_proc_fname="AA", 
@@ -63,10 +51,10 @@ ds_valid = ADPDataset(data_dir='/users/1/sull1276/mint/tests/../mint/data/ADP',
                        total_frames_valid=total_frames_valid, 
                        lag= OmegaConf.create({"equilibrium": True}), 
                        normalize= OmegaConf.create({"bool": True, "t_dependent": False}), 
-                       node_features= OmegaConf.create({"epsilon": True, "sigma": True, "charge": True, "mass": True}), 
-                       augement_rotations=False)
+                       node_features= OmegaConf.create({"epsilon": True, "sigma": True, "charge": True, "mass": True, "idx":True}),
+                       augement_rotations=True)
 
-max_epochs = 200
+max_epochs = 500
 
 module = EquivariantMINTModule(
     cfg=OmegaConf.create({
@@ -74,7 +62,6 @@ module = EquivariantMINTModule(
             "_target_": "mint.prior.normal.NormalPrior",
             "mean": 0.0,
             "std": 0.5,
-            "antithetic":True,
         },
         "embedder": {
             "_target_": "mint.model.embedding.equilibrium_embedder.EquilibriumEmbedder",
@@ -84,10 +71,13 @@ module = EquivariantMINTModule(
                 "max_positions": 1000,
             },
             "force_field": {
-                "in_dim": 4,
+                "in_dim": 5,
                 "hidden_dims": [128, 64],
                 "out_dim": 32,
                 "activation": "silu",
+                "use_input_bn": False,
+                "affine": False,
+                "track_running_stats": False,
             },
             "atom_type": {
                 "num_types": 14,
@@ -97,7 +87,7 @@ module = EquivariantMINTModule(
         "model": {
              "_target_": "mint.model.MLP.MINTMLP",
              "in_dim": 22*320+22*3,
-             "hidden_dims": (4096, 1024),
+             "hidden_dims": (512, 512),
              "out_dim": 22*3,
              "activation": "silu",
         },
@@ -113,7 +103,7 @@ module = EquivariantMINTModule(
         "optim": {
             "optimizer": {
                 "name": "Adam",
-                "lr": 5e-3,
+                "lr": 5e-4,
                 "betas": [0.9, 0.999],
             },
             "scheduler": {

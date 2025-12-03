@@ -12,15 +12,12 @@ class NormalPrior(MINTPrior):
     :param cfg:
         Configuration object (dataclass/dict/omegaconf) holding prior hyperparameters.
     :type cfg: Any
-
-    ANTITHETIC BROKEN NUMNUTZ IDIOT DUMBASS THAT IS NOOOOT WHAT IT IS WHAT WERE U THINKING
     """ 
 
-    def __init__(self, mean:float, std: float, antithetic = False) -> None:
+    def __init__(self, mean:float, std: float) -> None:
         super().__init__()
         self.std = std
         self.mean = mean
-        self.antithetic = antithetic
 
     def sample(self, batch: Data, stratified: bool = False) -> Data:
         """
@@ -32,7 +29,7 @@ class NormalPrior(MINTPrior):
         t_interpolant = torch.rand(B, device=device)
 
         batch['x_base'] = x_base
-        batch['x_base_irrep'] = Irreps("1o")
+        batch['x_base_irrep'] = Irreps("1e")
         batch['feature_keys'].add("x_base")
         batch['t_interpolant'] = t_interpolant
         return batch
