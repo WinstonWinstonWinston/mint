@@ -93,14 +93,14 @@ A `pip freeze > requirements.txt` generated `requirements.txt` is included for r
 
 ### Generate
 
-Before running, you must obtain a trained model checkpoint and update the base filename in `generate.py` to point to it. The checkpoint needs to be stored within `mint/EEProjectResults`. You must modify the **base directory** used by the script/config so the paths resolve correctly on your system.
+Before running, you must obtain a trained model checkpoint and update the base filename in `generate.py` to point to it. The checkpoint needs to be stored within `mint/EEProjectResults`. You must modify the **base directory** used by the script/config so the paths resolve correctly on your system. This is located within `generate.py` in a string variable named `base`.
 
 To obtain samples, `cd` into `mint/EEProjectResults` and run:
 ```bash
 python generate.py
 ```
 
-This script loads the model and integrates the stochastic interpolant forward in time to generate samples from the trained distribution. Outputs are written to `mint/EEProjectResults/output.xyz`. It will take 30-40 minutes roughly on an A40. 
+This script loads the model and integrates the stochastic interpolant forward in time to generate samples from the trained distribution. Outputs are written to `mint/EEProjectResults/output.xyz`. It will take 40-45 minutes roughly on an A40. 
 
 You can view the resulting `.xyz` file with Ovito: https://www.ovito.org/.
 
@@ -110,24 +110,23 @@ To switch between SDE and ODE sampling, modify the relevant `generate_cfg` setti
 
 This must be run **after** `generate` (i.e., after `output.xyz` has been produced). Running `dihedral` will create two plots in the output directory:
 
-- `FreeEnergy.png`
-- `Probability.png`
-
+- `FreeEnergy.png` relative energy of folding as a function of the phi psi angle.
+- `Probability.png` estimate probability of folding as a function of the phi psi angle.
 
 ### Train
 
-Before running, you must modify the **base directory** used by the script/config so the paths resolve correctly on your system.
+Before running, you must modify the **base directory** used by the script/config so the paths resolve correctly on your system.  This is located within `train.py` in a string variable named `base`. Before running be sure you are signed into wandb within that console.
 
 Training is launched from the same directory as `generate.py`. `cd` into `mint/EEProjectResults` and run:
 ```bash
 python train.py
 ```
-You can run this inline (interactive GPU session) or submit it using the provided SLURM script (which must be edited to match your resource/account/partition preferences). It will take roughly 8 hours for 100 epochs of the default dataset sizes. The provided checkpoint ran for 10 hours.
+You can run this inline (interactive GPU session) or submit it using the provided SLURM script (which must be edited to match your resource/account/partition preferences). We reccomend the slurm method. It will take roughly 8 hours for 100 epochs of the default dataset sizes. The provided checkpoint ran for 10 hours.
 
 Relevant model hyperparameters can be changed by inspecting the `EquivariantMINTModule` object and its associated configuration (i.e., the config fields that instantiate/parameterize the module).
 
 During training, outputs are logged and saved to:
-- Checkpoints: `"dirpath": base+"EEProjectResults/logs/hydra/ckpt"`
+- Checkpoints: `base+"EEProjectResults/logs/hydra/ckpt"`
 - Weights & Biases (wandb): `base+"EEProjectResults/logs/wandb"`
 
 ## Expected runtimes
