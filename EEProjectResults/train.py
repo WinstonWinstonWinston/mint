@@ -7,15 +7,17 @@ from omegaconf import OmegaConf
 import logging
 from pytorch_lightning.utilities.rank_zero import rank_zero_only
 
+#!!!! REPLACE ME WITH YOUR BASE DIRECTORY
+base = '/users/1/sull1276'
+#!!!!!!!!
+
 #************** Define the datasets involved *****************#
+
+data_dir = base + '/mint/tests/../mint/data/ADP'
 
 total_frames_train = 25600
 total_frames_test = 6400
 total_frames_valid = 6400
-
-#!!!! REPLACE ME WITH YOUR BASE DIRECTORY
-base = '/users/1/sull1276'
-data_dir = base + '/mint/tests/../mint/data/ADP'
 
 ds_train = ADPDataset(data_dir=data_dir, 
                        data_proc_fname="AA", 

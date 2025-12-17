@@ -4,7 +4,7 @@
 
 ## Environment setup (UMN/MSI)
 
-This project was run on UMN MSI GPU nodes using an interactive SLURM allocation, the UMN module stack (GCC/OpenMPI/CUDA), and a micromamba environment. The provided `setup_umn.sh` script reproduces the *working* environment used for the paper experiments by installing pinned versions of the CUDA 11.8 PyTorch stack, PyG (torch-geometric + compiled extensions), and supporting scientific packages.
+This project was run on UMN MSI GPU nodes using an interactive SLURM allocation, the UMN module stack (GCC/OpenMPI/CUDA), and a micromamba environment. The provided `setup_umn.sh` script reproduces the *working* environment `mintenv` used for the paper experiments by installing pinned versions of the CUDA 11.8 PyTorch stack, PyG (torch-geometric + compiled extensions), and supporting scientific packages.
 
 **Important note on reproducibility vs. minimal dependencies:**
 - The environment created by `setup_umn.sh` is intentionally a "known-good" snapshot that matches a working UMN/MSI setup. It may include more packages than are strictly required by the current codebase. This is expected: the goal is to replicate the results reliably, not to minimize the dependency set.
@@ -38,7 +38,7 @@ srun -N1 --ntasks=1 --gres=gpu:a40:1 -p interactive-gpu -t 04:00:00 --pty bash
 srun -N1 --ntasks-per-node=8 --cpus-per-task=1 --gres=gpu:a40:1 -p interactive-gpu -t 08:00:00 --pty bash
 ```
 
-- **A100 (example request)**
+- **V100 (example request)**
 ```bash
 srun -N 1 -t 08:00:00 --ntasks-per-node=1 -p v100 --mem-per-cpu=20gb --gres=gpu:1 --pty bash
 ```
@@ -48,9 +48,6 @@ srun -N 1 -t 08:00:00 --ntasks-per-node=1 -p v100 --mem-per-cpu=20gb --gres=gpu:
 In the allocated shell:
 ```bash
 conda deactivate
-```
-
-```bash
 module load gcc/8.2.0
 module load ompi/3.1.6/gnu-8.2.0
 module load cuda/11.8.0-gcc-7.2.0-xqzqlf2
@@ -70,7 +67,7 @@ Use the package versions pinned in `setup_umn.sh`. Beware that things may not ru
 
 After you request a GPU and load modules:
 ```bash
-micromamba activate mint
+micromamba activate mintenv
 ```
 
 Recommended sanity checks:
@@ -88,6 +85,50 @@ python -c "import torch; print(torch.__version__); print('CUDA available:', torc
 ### 6) `requirements.txt`
 
 A `pip freeze > requirements.txt` generated `requirements.txt` is included for reference. We recommend using `setup_umn.sh` instead.
+
+## Obtaining a Model Checkpoint
+
+
+## Reproducing Results
+
+### Generate
+
+Before running, you must obtain a trained model checkpoint and update the base filename in `generate.py` to point to it. The checkpoint needs to be stored within `mint/EEProjectResults`. You must modify the **base directory** used by the script/config so the paths resolve correctly on your system.
+
+To obtain samples, `cd` into `mint/EEProjectResults` and run:
+```bash
+python generate.py
+```
+
+This script loads the model and integrates the stochastic interpolant forward in time to generate samples from the trained distribution. Outputs are written to `mint/EEProjectResults/output.xyz`. It will take 30-40 minutes roughly on an A40. 
+
+You can view the resulting `.xyz` file with Ovito: https://www.ovito.org/.
+
+To switch between SDE and ODE sampling, modify the relevant `generate_cfg` settings used by `generate.py` (SDE vs. ODE mode). Other such hyper parameters may be modified by inspecting the relevant configs (epsilon function, number of samples, return trajectory, etc.)
+
+### Dihedral
+
+This must be run **after** `generate` (i.e., after `output.xyz` has been produced). Running `dihedral` will create two plots in the output directory:
+
+- `FreeEnergy.png`
+- `Probability.png`
+
+
+### Train
+
+Before running, you must modify the **base directory** used by the script/config so the paths resolve correctly on your system.
+
+Training is launched from the same directory as `generate.py`. `cd` into `mint/EEProjectResults` and run:
+```bash
+python train.py
+```
+You can run this inline (interactive GPU session) or submit it using the provided SLURM script (which must be edited to match your resource/account/partition preferences). It will take roughly 8 hours for 100 epochs of the default dataset sizes. The provided checkpoint ran for 10 hours.
+
+Relevant model hyperparameters can be changed by inspecting the `EquivariantMINTModule` object and its associated configuration (i.e., the config fields that instantiate/parameterize the module).
+
+During training, outputs are logged and saved to:
+- Checkpoints: `"dirpath": base+"EEProjectResults/logs/hydra/ckpt"`
+- Weights & Biases (wandb): `base+"EEProjectResults/logs/wandb"`
 
 ## Expected runtimes
 
