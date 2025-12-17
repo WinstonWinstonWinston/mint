@@ -145,7 +145,7 @@ module = EquivariantMINTModule(
 )
 
 # Load checkpoint
-ckpt = torch.load(base+"/EEProjectResults/PaiNNSO3_idx.ckpt", map_location="cuda")
+ckpt = torch.load(base+"/main/PaiNNSO3_idx.ckpt", map_location="cuda")
 module.load_state_dict(ckpt["state_dict"])
 
 print(module)

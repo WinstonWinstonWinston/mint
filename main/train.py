@@ -6,6 +6,8 @@ from mint.experiment.equivariance_test import EquivarianceTest
 from omegaconf import OmegaConf
 import logging
 from pytorch_lightning.utilities.rank_zero import rank_zero_only
+from pathlib import Path
+import logging
 
 #!!!! REPLACE ME WITH YOUR BASE DIRECTORY
 base = '/users/1/sull1276'
@@ -13,7 +15,7 @@ base = '/users/1/sull1276'
 
 #************** Define the datasets involved *****************#
 
-data_dir = base + '/mint/tests/../mint/data/ADP'
+data_dir = base + '/mint/data/ADP'
 
 total_frames_train = 25600
 total_frames_test = 6400
@@ -136,7 +138,7 @@ module = EquivariantMINTModule(
             },
         },
         "augment_rotations": False,
-        "meta_keys":ds_train.meta_keys
+        "meta_keys": ds_train.meta_keys
     })
 )
 
@@ -220,7 +222,7 @@ train_cfg = OmegaConf.create({
         "precision": "32-true",
     },
     "checkpointer": {
-        "dirpath": base+"/EEProjectResults/logs/hydra/ckpt",
+        "dirpath": f"{base}/mint/main/logs/hydra/ckpt",
         "save_last": True,
         "save_top_k": 5,
         "monitor": "val/loss",
@@ -231,7 +233,7 @@ train_cfg = OmegaConf.create({
     "wandb": {
         "name": "mint",
         "project": "mint",
-        "save_dir": base+"/EEProjectResults/logs/wandb",
+        "save_dir": f"{base}/mint/main/logs/wandb",
     },
     "wandb_watch": {
         "log": "all",
@@ -251,6 +253,15 @@ train_cfg = OmegaConf.create({
     "num_device": 1,
     "project": {"name": "mint"}
 })
+
+results_dir = Path(base) / "main"
+results_dir.mkdir(parents=True, exist_ok=True)
+
+log_path = results_dir / "run.log"
+logging.basicConfig(
+    level=logging.INFO,
+    handlers=[logging.FileHandler(log_path), logging.StreamHandler()],
+)
 
 logger = logging.getLogger(__name__)
 
