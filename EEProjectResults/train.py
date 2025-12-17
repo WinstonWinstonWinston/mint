@@ -220,7 +220,7 @@ train_cfg = OmegaConf.create({
         "precision": "32-true",
     },
     "checkpointer": {
-        "dirpath": base+"EEProjectResults/logs/hydra/ckpt",
+        "dirpath": base+"/EEProjectResults/logs/hydra/ckpt",
         "save_last": True,
         "save_top_k": 5,
         "monitor": "val/loss",
@@ -231,7 +231,7 @@ train_cfg = OmegaConf.create({
     "wandb": {
         "name": "mint",
         "project": "mint",
-        "save_dir": base+"EEProjectResults/logs/wandb",
+        "save_dir": base+"/EEProjectResults/logs/wandb",
     },
     "wandb_watch": {
         "log": "all",

@@ -1,15 +1,9 @@
 from abc import abstractmethod
 from torch import Tensor
-import os
-import pickle
-import gzip
-import zstandard as zstd
 import torch
 from torch.utils.data import Dataset
 from omegaconf import DictConfig
 import copy
-from e3nn import o3
-from e3nn.o3 import Irreps
 
 class MINTDataset(Dataset):
     """ Abstract dataset class for mint

@@ -1,5 +1,5 @@
 # management 
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig
 from tqdm.auto import tqdm
 
 from mint.experiment.abstract import Experiment

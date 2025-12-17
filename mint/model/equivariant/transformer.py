@@ -1,10 +1,9 @@
 import torch
 from torch_cluster import radius_graph
-from torch_scatter import scatter,scatter_max
+from torch_scatter import scatter
 from e3nn import o3
 import e3nn.nn as enn
 from e3nn.o3 import Linear, Irreps
-from e3nn.nn import BatchNorm
 from e3nn.math import soft_unit_step, soft_one_hot_linspace
 from mint.utils import channels_arr_to_string, parse_activation
 from torch_geometric.utils import softmax

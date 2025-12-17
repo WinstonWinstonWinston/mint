@@ -1,12 +1,10 @@
 import torch.nn as nn
 from e3nn.math import  soft_one_hot_linspace
-from torch_scatter import scatter
 from torch_cluster import radius_graph
-from mint.utils import combine_features,channels_arr_to_string,parse_activation
 import torch
 from e3nn import o3
 from torch import nn
-from torch_geometric.nn import TransformerConv, global_mean_pool
+from torch_geometric.nn import TransformerConv
 
 class GraphTransformer(nn.Module):
     def __init__(self, in_dim, hidden_dim, out_dim, edge_dim, heads=4, num_layers=3):

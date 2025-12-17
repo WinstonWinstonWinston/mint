@@ -1,7 +1,6 @@
 import torch
 from .abstract import Corrector
 
-
 class IdentityCorrector(Corrector):
     """
     Corrector that does nothing.
@@ -43,7 +42,6 @@ class IdentityCorrector(Corrector):
         :rtype: torch.Tensor
         """
         return x_1.clone()
-
 
 class PeriodicBoundaryConditionsCorrector(Corrector):
     """

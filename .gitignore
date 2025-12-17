@@ -17,6 +17,10 @@ lightning_logs/
 *.pth
 *.ckpt
 
+#random folders
+tests/
+docs/
+
 # logs
 *.log
 

@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import Any
 from torch import Tensor
 from torch_geometric.data import Data
 

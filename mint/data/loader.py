@@ -1,7 +1,7 @@
 from pytorch_lightning import LightningDataModule
 from omegaconf import DictConfig
 
-from torch_geometric.data import Data, Batch
+from torch_geometric.data import Batch
 from torch.utils.data import DataLoader
 
 def make_meta_collate(meta_keys):
