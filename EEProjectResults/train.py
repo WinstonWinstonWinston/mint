@@ -3,16 +3,21 @@ from mint.data.ADP.ADP_dataset import ADPDataset
 from mint.module import EquivariantMINTModule
 from mint.experiment.train import Train
 from mint.experiment.equivariance_test import EquivarianceTest
-import torch
 from omegaconf import OmegaConf
 import logging
 from pytorch_lightning.utilities.rank_zero import rank_zero_only
+
+#************** Define the datasets involved *****************#
 
 total_frames_train = 25600
 total_frames_test = 6400
 total_frames_valid = 6400
 
-ds_train = ADPDataset(data_dir='/users/1/sull1276/mint/tests/../mint/data/ADP', 
+#!!!! REPLACE ME WITH YOUR BASE DIRECTORY
+base = '/users/1/sull1276'
+data_dir = base + '/mint/tests/../mint/data/ADP'
+
+ds_train = ADPDataset(data_dir=data_dir, 
                        data_proc_fname="AA", 
                        data_proc_ext=".pkl.zst", 
                        data_raw_fname="alanine-dipeptide-250ns-nowater", 
@@ -24,9 +29,9 @@ ds_train = ADPDataset(data_dir='/users/1/sull1276/mint/tests/../mint/data/ADP',
                        lag= OmegaConf.create({"equilibrium": True}), 
                        normalize= OmegaConf.create({"bool": True, "t_dependent": False}), 
                        node_features= OmegaConf.create({"epsilon": True, "sigma": True, "charge": True, "mass": True, "idx":True}), 
-                       augement_rotations=True)
+                       augement_rotations=False)
 
-ds_test = ADPDataset(data_dir='/users/1/sull1276/mint/tests/../mint/data/ADP', 
+ds_test = ADPDataset(data_dir=data_dir, 
                        data_proc_fname="AA", 
                        data_proc_ext=".pkl.zst", 
                        data_raw_fname="alanine-dipeptide-250ns-nowater", 
@@ -38,9 +43,9 @@ ds_test = ADPDataset(data_dir='/users/1/sull1276/mint/tests/../mint/data/ADP',
                        lag= OmegaConf.create({"equilibrium": True}), 
                        normalize= OmegaConf.create({"bool": True, "t_dependent": False}), 
                        node_features= OmegaConf.create({"epsilon": True, "sigma": True, "charge": True, "mass": True, "idx":True}),
-                       augement_rotations=True)
+                       augement_rotations=False)
 
-ds_valid = ADPDataset(data_dir='/users/1/sull1276/mint/tests/../mint/data/ADP', 
+ds_valid = ADPDataset(data_dir=data_dir, 
                        data_proc_fname="AA", 
                        data_proc_ext=".pkl.zst", 
                        data_raw_fname="alanine-dipeptide-250ns-nowater", 
@@ -52,54 +57,13 @@ ds_valid = ADPDataset(data_dir='/users/1/sull1276/mint/tests/../mint/data/ADP',
                        lag= OmegaConf.create({"equilibrium": True}), 
                        normalize= OmegaConf.create({"bool": True, "t_dependent": False}), 
                        node_features= OmegaConf.create({"epsilon": True, "sigma": True, "charge": True, "mass": True, "idx":True}),
-                       augement_rotations=True)
+                       augement_rotations=False)
 
 max_epochs = 500
 
+#**************************************************#
 
-ds_train = ADPDataset(data_dir='/users/1/sull1276/mint/tests/../mint/data/ADP', 
-                       data_proc_fname="AA", 
-                       data_proc_ext=".pkl.zst", 
-                       data_raw_fname="alanine-dipeptide-250ns-nowater", 
-                       data_raw_ext=".xtc", 
-                       split="train", 
-                       total_frames_train=total_frames_train, 
-                       total_frames_test=total_frames_test, 
-                       total_frames_valid=total_frames_valid, 
-                       lag= OmegaConf.create({"equilibrium": True}), 
-                       normalize= OmegaConf.create({"bool": True, "t_dependent": False}), 
-                       node_features= OmegaConf.create({"epsilon": True, "sigma": True, "charge": True, "mass": True, "idx":True}), 
-                       augement_rotations=True)
-
-ds_test = ADPDataset(data_dir='/users/1/sull1276/mint/tests/../mint/data/ADP', 
-                       data_proc_fname="AA", 
-                       data_proc_ext=".pkl.zst", 
-                       data_raw_fname="alanine-dipeptide-250ns-nowater", 
-                       data_raw_ext=".xtc", 
-                       split="test", 
-                       total_frames_train=total_frames_train, 
-                       total_frames_test=total_frames_test, 
-                       total_frames_valid=total_frames_valid, 
-                       lag= OmegaConf.create({"equilibrium": True}), 
-                       normalize= OmegaConf.create({"bool": True, "t_dependent": False}), 
-                       node_features= OmegaConf.create({"epsilon": True, "sigma": True, "charge": True, "mass": True, "idx":True}),
-                       augement_rotations=True)
-
-ds_valid = ADPDataset(data_dir='/users/1/sull1276/mint/tests/../mint/data/ADP', 
-                       data_proc_fname="AA", 
-                       data_proc_ext=".pkl.zst", 
-                       data_raw_fname="alanine-dipeptide-250ns-nowater", 
-                       data_raw_ext=".xtc", 
-                       split="valid", 
-                       total_frames_train=total_frames_train, 
-                       total_frames_test=total_frames_test, 
-                       total_frames_valid=total_frames_valid, 
-                       lag= OmegaConf.create({"equilibrium": True}), 
-                       normalize= OmegaConf.create({"bool": True, "t_dependent": False}), 
-                       node_features= OmegaConf.create({"epsilon": True, "sigma": True, "charge": True, "mass": True, "idx":True}),
-                       augement_rotations=True)
-
-max_epochs = 500
+################# Create the model #################
 
 module = EquivariantMINTModule(
     cfg=OmegaConf.create({
@@ -130,38 +94,23 @@ module = EquivariantMINTModule(
             },
         },
         "model": {
-            "_target_": "mint.model.MPN.GraphTransformerInterpolantNet",
-
-            # scalar / shared
-            "in_dim": 320,
-
-            # cond branch
-            "in_dim_cond": 16,
-            "hidden_dim_cond": 96,
-            "out_dim_cond": 16,
-            "heads_cond": 8,
-            "num_layers_cond": 2,
-
-            # b branch
-            "in_dim_b": 16,
-            "hidden_dim_b": 96,
-            "out_dim_b": 3,
-            "heads_b": 8,
-            "num_layers_b": 2,
-
-            # eta branch
-            "in_dim_eta": 16,
-            "hidden_dim_eta": 96,
-            "out_dim_eta": 3,
-            "heads_eta": 8,
-            "num_layers_eta": 2,
-
-            # edge / geometry
+            "_target_": "mint.model.equivariant.PaiNN.PaiNNLikeInterpolantNet",
+            "irreps_input":        [[320  ], []],
+            "irreps":              [[32, 32], []],
+            "irreps_readout_cond": [[32, 32], []],
+            "irreps_readout":      [[0, 1], []],
             "edge_l_max": 1,
             "max_radius": 1000,
             "max_neighbors": 1000,
             "number_of_basis": 64,
             "edge_basis": "gaussian",
+            "mlp_act": "silu",
+            "mlp_drop": 0,
+            "conv_weight_layers": [192],
+            "update_weight_layers": [128],
+            "message_update_count_cond": 2,
+            "message_update_count_eta": 2,
+            "message_update_count_b": 2,
         },
         "interpolant": {
             "_target_": "mint.interpolant.interpolants.TemporallyLinearInterpolant",
@@ -174,24 +123,20 @@ module = EquivariantMINTModule(
         },
         "optim": {
             "optimizer": {
-                "name": "AdamW",
-                "lr": 3e-4,
+                "name": "Adam",
+                "lr": 5e-4,
                 "betas": [0.9, 0.999],
-                "weight_decay": 1e-2  
             },
             "scheduler": {
                 "name": "CosineAnnealingLR",
                 "T_max": "experiment.train.trainer.max_epochs",
-                "eta_min": 1e-5
-            }
+                "eta_min": 1e-6,
+            },
         },
-        "augment_rotations": True,
+        "augment_rotations": False,
         "meta_keys":ds_train.meta_keys
     })
 )
-
-ckpt = torch.load("GraphTransformer.ckpt", map_location="cuda")
-module.load_state_dict(ckpt["state_dict"])
 
 print(module)
     
@@ -203,8 +148,11 @@ st = MINTState(
     dataset_test=ds_test,
 )
 
+
+#&&&&&&&&&&&&&&&&&&&&&& Perform an equivariance test &&&&&&&&&&&&&&&&&&&&&&#
+
 eqv_test_cfg = OmegaConf.create({"split":"train",
-                                 "batch_size": 3,
+                                 "batch_size":3,
                                  "number_of_trials":5,
                                  "tolerance_dict": {"x": 1e-6,
                                                     "charge":1e-6,
@@ -248,6 +196,11 @@ for k, v in sorted(results.items()):
     print(row_fmt.format(k, status, mean, std, max_, tol, nb, na))
 
 
+#&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&#
+
+
+#???????????????? Train a model ????????????????#
+
 train_cfg = OmegaConf.create({
     "trainer": {
         "overfit_batches": 0,
@@ -260,12 +213,12 @@ train_cfg = OmegaConf.create({
         "val_check_interval": 1.0,
         "check_val_every_n_epoch": 1,
         "accumulate_grad_batches": 1,
-        "gradient_clip_val": 1e3,
+        "gradient_clip_val": 1.0,
         "gradient_clip_algorithm": "norm",
         "precision": "32-true",
     },
     "checkpointer": {
-        "dirpath": "/users/1/sull1276/mint/tests/logs/hydra/ckpt",
+        "dirpath": base+"EEProjectResults/logs/hydra/ckpt",
         "save_last": True,
         "save_top_k": 5,
         "monitor": "val/loss",
@@ -276,7 +229,7 @@ train_cfg = OmegaConf.create({
     "wandb": {
         "name": "mint",
         "project": "mint",
-        "save_dir": "/users/1/sull1276/mint/tests/logs/wandb",
+        "save_dir": base+"EEProjectResults/logs/wandb",
     },
     "wandb_watch": {
         "log": "all",
@@ -288,9 +241,9 @@ train_cfg = OmegaConf.create({
         "num_workers": 8,
         "prefetch_factor": 2,
         "batch_size": {
-            "train": 512,
-            "valid": 512,
-            "test": 512
+            "train": 128,
+            "valid": 128,
+            "test": 128
         },
     },
     "num_device": 1,
@@ -304,7 +257,12 @@ for level in logging_levels:
     setattr(logger, level, rank_zero_only(getattr(logger, level)))
     
 trainer = Train(st, train_cfg, logger)
+
 trainer.run()
+
+#????????????????????????????????#
+
+#&&&&&&&&&&&&&&&&&&&&&& Perform an equivariance test again &&&&&&&&&&&&&&&&&&&&&&#
 
 results = eqv_test.run()
 row_fmt = "{:<15} {:<6} {:>10} {:>10} {:>10} {:>10} {:>14} {:>14}"
@@ -324,3 +282,5 @@ for k, v in sorted(results.items()):
     status = "OK" if v["all_true"].item() else "FAIL"
 
     print(row_fmt.format(k, status, mean, std, max_, tol, nb, na))
+
+#&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&#

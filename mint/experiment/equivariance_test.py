@@ -90,6 +90,7 @@ class EquivarianceTest(Experiment):
         with torch.no_grad():
             results = []
             for batch in tqdm(loader):
+                batch = self.state.module.transfer_batch_to_device(batch, torch.device(self.state.module.device), 0) #type:ignore
                 results.append(
                     self.state.module.test_equivariance(batch, self.cfg.tolerance_dict)  # type: ignore
                 )

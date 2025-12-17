@@ -24,6 +24,23 @@ class MINTModule(LightningModule):
         self.model = hydra.utils.instantiate(cfg.model)
         self.interpolant = hydra.utils.instantiate(cfg.interpolant)
 
+    def transfer_batch_to_device(self, batch, device, dataloader_idx):
+        # Save meta fields and temporarily remove them
+        meta = {}
+        for k in list(self.cfg.meta_keys):
+            if hasattr(batch, k):
+                meta[k] = getattr(batch, k)
+                delattr(batch, k)
+
+        # Now move only the remaining attributes (tensors etc.) to device
+        batch = batch.to(device)
+
+        # Re-attach meta fields unchanged
+        for k, v in meta.items():
+            setattr(batch, k, v)
+
+        return batch
+
     def forward(self, batch):
         """
         TODO: Finish return param typing here
@@ -254,8 +271,29 @@ class EquivariantMINTModule(MINTModule):
         rotated_batch = copy(batch)
         for key in batch['feature_keys']:
             irrep : o3.Irreps = batch[key+"_irrep"]
-            D = irrep.D_from_matrix(R)
+            D = irrep.D_from_matrix(R).to(batch.x.device)
             x_dense, mask =to_dense_batch(batch[key],batch['batch'])
             rotated_batch[key] = torch.einsum('Bij,BNj->BNi',D,x_dense)[mask]
 
         return rotated_batch
+    
+    def forward(self, batch):
+        """
+        TODO: Finish return param typing here
+        Implements a forward pass through the embedders and model.
+
+        :param batch:
+            A torch batch of geometric data objects which come from a data loader. 
+        :type batch: torch_geometric.data.Data
+
+        :return:
+            A new batch object with modified keys containing velocity, score, denoised point etc.
+        :rtype: torch_geometric.data.Data??
+        """
+        if self.training and self.cfg.augment_rotations:
+            R =self.random_group_action(batch)
+            # rotate the batch
+            batch= self.apply_group_action(R,batch)
+        f = self.embedder.forward(batch)
+        f = self.model.forward(f)
+        return f
