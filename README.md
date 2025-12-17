@@ -169,7 +169,7 @@ meta_keys: ds_train.meta_keys
 
 ### Prepare ADP dataset files (rename + place)
 
-After downloading the three XTC trajectories, rename them to the filenames expected by the code and place them under `mint/data/ADP/` alongside the PDB.
+After downloading the three XTC trajectories from **[here](https://markovmodel.github.io/mdshare/ALA2/)**, rename them to the filenames expected by the code and place them under `mint/data/ADP/` alongside the PDB.
 
 ### Required renames
 
