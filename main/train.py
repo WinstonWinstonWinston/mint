@@ -10,7 +10,7 @@ from pathlib import Path
 import logging
 
 #!!!! REPLACE ME WITH YOUR BASE DIRECTORY
-base = '/users/1/sull1276'
+base = '/users/1/sull1276/mint'
 #!!!!!!!!
 
 #************** Define the datasets involved *****************#
@@ -222,7 +222,7 @@ train_cfg = OmegaConf.create({
         "precision": "32-true",
     },
     "checkpointer": {
-        "dirpath": f"{base}/mint/main/logs/hydra/ckpt",
+        "dirpath": f"{base}/main/logs/hydra/ckpt",
         "save_last": True,
         "save_top_k": 5,
         "monitor": "val/loss",
@@ -233,7 +233,7 @@ train_cfg = OmegaConf.create({
     "wandb": {
         "name": "mint",
         "project": "mint",
-        "save_dir": f"{base}/mint/main/logs/wandb",
+        "save_dir": f"{base}/main/logs/wandb",
     },
     "wandb_watch": {
         "log": "all",

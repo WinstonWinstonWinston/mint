@@ -9,7 +9,7 @@
 #SBATCH --cpus-per-task=8             # CPUs for DataLoader workers
 #SBATCH --gres=gpu:a40:1
 
-# ---- Env setup -----------------------------------------
+# ---- Env setup -----------------------------------x`------
 module purge
 module load gcc/8.2.0
 module load ompi/3.1.6/gnu-8.2.0
