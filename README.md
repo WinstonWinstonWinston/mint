@@ -86,8 +86,84 @@ python -c "import torch; print(torch.__version__); print('CUDA available:', torc
 
 A `pip freeze > requirements.txt` generated `requirements.txt` is included for reference. We recommend using `setup_umn.sh` instead.
 
-## Obtaining a Model Checkpoint
+## Provided checkpoint and training configuration
 
+A pretrained checkpoint is available at **[here](https://drive.google.com/file/d/1mLgu-XAAchu-LjP4JbRDX0Wb-R6oyNEl/view?usp=sharing)**. This checkpoint was trained for approximately **10 hours** using the configuration below.
+
+### How to use the checkpoint
+
+1. Download the checkpoint from  **[here](https://drive.google.com/file/d/1mLgu-XAAchu-LjP4JbRDX0Wb-R6oyNEl/view?usp=sharing)**.
+2. Place it inside:
+   - `mint/EEProjectResults/`
+3. Update the checkpoint/base filename (and your `base` directory, if applicable) in `generate.py` so it points to the downloaded file.
+
+### Configuration used to train the checkpoint
+
+```yaml
+prior:
+  _target_: mint.prior.normal.NormalPrior
+  mean: 0.0
+  std: 0.5
+
+embedder:
+  _target_: mint.model.embedding.equilibrium_embedder.EquilibriumEmbedder
+  use_ff: true
+  interp_time:
+    embedding_dim: 256
+    max_positions: 1000
+  force_field:
+    in_dim: 5
+    hidden_dims: [128, 64]
+    out_dim: 32
+    activation: silu
+    use_input_bn: false
+    affine: false
+    track_running_stats: false
+  atom_type:
+    num_types: 14
+    embedding_dim: 32
+
+model:
+  _target_: mint.model.equivariant.PaiNN.PaiNNLikeInterpolantNet
+  irreps_input: [[320], []]
+  irreps: [[32, 32], []]
+  irreps_readout_cond: [[32, 32], []]
+  irreps_readout: [[0, 1], []]
+  edge_l_max: 1
+  max_radius: 1000
+  max_neighbors: 1000
+  number_of_basis: 64
+  edge_basis: gaussian
+  mlp_act: silu
+  mlp_drop: 0
+  conv_weight_layers: [192]
+  update_weight_layers: [128]
+  message_update_count_cond: 2
+  message_update_count_eta: 2
+  message_update_count_b: 2
+
+interpolant:
+  _target_: mint.interpolant.interpolants.TemporallyLinearInterpolant
+  velocity_weight: 1.0
+  denoiser_weight: 1.0
+  gamma_weight: 0.1  # (= 1/10)
+
+validation:
+  stratified: false
+
+optim:
+  optimizer:
+    name: Adam
+    lr: 5e-4
+    betas: [0.9, 0.999]
+  scheduler:
+    name: CosineAnnealingLR
+    T_max: experiment.train.trainer.max_epochs
+    eta_min: 1e-6
+
+augment_rotations: false
+meta_keys: ds_train.meta_keys
+```
 
 ## Reproducing Results
 
